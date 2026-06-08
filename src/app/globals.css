@@ -173,21 +173,9 @@ body {
   backface-visibility: hidden;
 }
 
-/* Game slider — CSS auto scroll (works on mobile) */
+/* Game slider — auto scroll + native touch swipe */
 .game-slider-wrap {
   mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
-}
-
-.game-slider-track {
-  width: max-content;
-  animation: game-slider-scroll 38s linear infinite;
-  will-change: transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.game-slider-wrap.is-paused .game-slider-track {
-  animation-play-state: paused;
 }
 
 .game-slider-scroll {
@@ -195,6 +183,7 @@ body {
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
+  overscroll-behavior-x: contain;
 }
 
 .game-slider-scroll::-webkit-scrollbar {
@@ -203,6 +192,7 @@ body {
 
 .game-slider-card {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  touch-action: pan-x;
 }
 
 .game-slider-card:hover {
@@ -327,11 +317,6 @@ body {
     transform: scale(1.05);
     filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.5));
   }
-}
-
-@keyframes game-slider-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
 }
 
 @keyframes carousel-left {
