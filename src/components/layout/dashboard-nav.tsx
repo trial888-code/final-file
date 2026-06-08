@@ -1,0 +1,209 @@
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LayoutDashboard,
+  Gamepad2,
+  MessageSquare,
+  Bell,
+  Crown,
+  Users,
+  Shield,
+  BarChart3,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SITE_NAME } from "@/lib/constants";
+import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+
+const userLinks = [
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/requests", label: "Game Requests", icon: Gamepad2 },
+  { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+  { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
+  { href: "/dashboard/referrals", label: "Referrals", icon: Users },
+];
+
+const adminLinks = [
+  { href: "/admin", label: "Admin Panel", icon: Shield },
+  { href: "/admin/chat", label: "Customer Chat", icon: MessageSquare },
+  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/requests", label: "Requests", icon: Gamepad2 },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+];
+
+interface DashboardNavProps {
+  isAdmin?: boolean;
+}
+
+function NavLinks({
+  pathname,
+  isAdmin,
+  onNavigate,
+}: {
+  pathname: string;
+  isAdmin: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <>
+      {userLinks.map((link) => {
+        const Icon = link.icon;
+        const active =
+          pathname === link.href ||
+          (link.href !== "/dashboard" && pathname.startsWith(link.href));
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+              active
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {link.label}
+          </Link>
+        );
+      })}
+
+      {isAdmin && (
+        <>
+          <div className="pt-4 pb-2 px-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+              Admin Only
+            </p>
+          </div>
+          {adminLinks.map((link) => {
+            const Icon = link.icon;
+            const active =
+              pathname === link.href ||
+              (link.href !== "/admin" && pathname.startsWith(link.href));
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                  active
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
+
+export function DashboardNav({ isAdmin = false }: DashboardNavProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 glass border-b border-border h-14 flex items-center justify-between px-4">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <Image src="/logo.jpeg" alt={SITE_NAME} width={28} height={28} className="rounded-lg" />
+          <span className="font-bold gradient-text text-sm">{SITE_NAME}</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="p-2 rounded-lg hover:bg-muted"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </header>
+
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="lg:hidden fixed inset-0 z-50 bg-black/60"
+              onClick={() => setMobileOpen(false)}
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-72 glass border-r border-border flex flex-col"
+            >
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <span className="font-bold gradient-text">{SITE_NAME}</span>
+                <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+                <NavLinks
+                  pathname={pathname}
+                  isAdmin={isAdmin}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              </nav>
+              <div className="p-3 border-t border-border">
+                <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-64 flex-col glass border-r border-border min-h-screen">
+        <div className="p-4 border-b border-border">
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.jpeg" alt={SITE_NAME} width={32} height={32} className="rounded-lg" />
+            <span className="font-bold gradient-text">{SITE_NAME}</span>
+          </Link>
+        </div>
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <NavLinks pathname={pathname} isAdmin={isAdmin} />
+        </nav>
+        <div className="p-3 border-t border-border">
+          <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </aside>
+    </>
+  );
+}

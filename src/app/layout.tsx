@@ -1,0 +1,34 @@
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
+import { OrganizationSchema, WebsiteSchema } from "@/lib/seo/json-ld";
+import { homeMetadata } from "@/lib/seo/metadata";
+import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
+import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+
+export const metadata: Metadata = homeMetadata;
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className="dark">
+      <head>
+        <OrganizationSchema />
+        <WebsiteSchema />
+        <link rel="icon" href="/logo.jpeg" />
+      </head>
+      <body className={inter.className}>
+        {children}
+        <ChatWidgetLoader />
+        <Toaster theme="dark" position="top-right" richColors />
+      </body>
+    </html>
+  );
+}
