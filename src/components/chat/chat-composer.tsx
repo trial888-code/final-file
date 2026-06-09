@@ -71,7 +71,13 @@ export function ChatComposer({
   const canSend = !disabled && !loading && (Boolean(value.trim()) || Boolean(pendingFile));
 
   return (
-    <form onSubmit={handleSubmit} className={cn("border-t border-border", className)}>
+    <form
+      onSubmit={handleSubmit}
+      className={cn(
+        "border-t border-border shrink-0 bg-inherit pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+        className
+      )}
+    >
       {pendingFile && (
         <div className="px-3 pt-3 flex items-start gap-2">
           {previewUrl ? (
@@ -99,7 +105,7 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="p-2 sm:p-3 flex gap-1.5 sm:gap-2 items-center">
+      <div className="p-2 sm:p-3 grid grid-cols-[44px_minmax(0,1fr)_44px] sm:grid-cols-[44px_minmax(0,1fr)_auto] gap-2 items-center max-w-full">
         <input
           ref={fileInputRef}
           type="file"
@@ -114,7 +120,7 @@ export function ChatComposer({
           disabled={disabled || loading}
           onClick={() => fileInputRef.current?.click()}
           aria-label="Attach file"
-          className="shrink-0 h-10 w-10"
+          className="h-11 w-11 shrink-0"
         >
           <Paperclip className="h-4 w-4" />
         </Button>
@@ -123,16 +129,20 @@ export function ChatComposer({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled || loading}
-          className="flex-1 min-w-0 h-10"
+          className="min-w-0 w-full h-11 text-base sm:text-sm"
         />
         <Button
           type="submit"
           disabled={!canSend}
-          size={showSendLabel ? "default" : "icon"}
-          className="shrink-0 h-10 w-10 sm:w-auto sm:px-4"
+          size="icon"
+          aria-label="Send message"
+          className={cn(
+            "h-11 w-11 shrink-0",
+            showSendLabel && "sm:w-auto sm:min-w-[44px] sm:px-4"
+          )}
         >
-          <Send className="h-4 w-4" />
-          {showSendLabel && <span className="hidden sm:inline sm:ml-1">Send</span>}
+          <Send className="h-5 w-5 shrink-0" />
+          {showSendLabel && <span className="hidden sm:inline ml-1">Send</span>}
         </Button>
       </div>
     </form>

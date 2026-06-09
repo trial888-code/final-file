@@ -270,11 +270,13 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
 
         <div
           className={cn(
-            "md:col-span-2 flex flex-col min-h-[70vh]",
-            !mobileChatOpen ? "hidden md:flex" : "flex fixed inset-x-0 top-14 bottom-0 z-30 md:static md:z-auto md:inset-auto bg-[#0f0f0f] md:bg-transparent"
+            "md:col-span-2 flex flex-col min-h-0",
+            !mobileChatOpen
+              ? "hidden md:flex md:min-h-[70vh]"
+              : "flex fixed inset-x-0 top-14 bottom-0 z-30 h-[calc(100dvh-3.5rem)] md:static md:z-auto md:inset-auto md:h-auto md:min-h-[70vh] bg-[#0f0f0f] md:bg-transparent overflow-hidden"
           )}
         >
-          <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-[#121212]">
+          <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -296,7 +298,10 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
             </Badge>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[280px] bg-[#0f0f0f]">
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-6 space-y-3 bg-[#0f0f0f]"
+          >
             {messages.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 No messages yet. Send a reply to start the conversation.
@@ -311,7 +316,7 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
+                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words",
                         isAdminMsg
                           ? "gradient-bg text-white rounded-br-md"
                           : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
@@ -337,9 +342,9 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
             onSend={handleSend}
             loading={loading}
             disabled={!selectedId}
-            placeholder="Type your reply to the customer..."
+            placeholder="Type a message..."
             showSendLabel
-            className="bg-[#121212] border-white/10 shrink-0 sticky bottom-0 z-10 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-0"
+            className="bg-[#121212] border-white/10"
           />
         </div>
       </div>
