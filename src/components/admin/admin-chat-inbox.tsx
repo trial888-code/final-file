@@ -10,6 +10,7 @@ import { getAdminConversationUnreads, type AdminConversationUnread } from "@/lib
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
+import { MobileChatShell } from "@/components/chat/mobile-chat-shell";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -195,6 +196,86 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
     return true;
   }
 
+  function ChatPanel({ showMobileBack }: { showMobileBack?: boolean }) {
+    return (
+      <>
+        <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
+          {showMobileBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setMobileChatOpen(false)}
+              aria-label="Back to customers"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold truncate text-white">
+              {selected?.user?.full_name || "Customer"}
+            </h2>
+            <p className="text-xs text-muted-foreground truncate">
+              {displayContact(selected?.user)}
+            </p>
+          </div>
+          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
+            Live
+          </Badge>
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]"
+        >
+          {messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No messages yet. Send a reply to start the conversation.
+            </p>
+          ) : (
+            messages.map((msg) => {
+              const isAdminMsg = msg.sender_id === adminId;
+              return (
+                <div
+                  key={msg.id}
+                  className={cn("flex", isAdminMsg ? "justify-end" : "justify-start")}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words",
+                      isAdminMsg
+                        ? "gradient-bg text-white rounded-br-md"
+                        : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
+                    )}
+                  >
+                    {!isAdminMsg && (
+                      <p className="text-[10px] font-semibold text-orange-400 mb-1">Customer</p>
+                    )}
+                    <ChatMessageContent message={msg} />
+                    <p className="text-[10px] opacity-60 mt-1.5">
+                      {formatRelativeTime(msg.created_at)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <ChatComposer
+          value={input}
+          onChange={setInput}
+          onSend={handleSend}
+          loading={loading}
+          disabled={!selectedId}
+          placeholder="Type a message..."
+          showSendLabel
+          className="bg-[#121212] border-white/10"
+        />
+      </>
+    );
+  }
+
   if (conversations.length === 0) {
     return (
       <Card className="p-12 text-center">
@@ -208,146 +289,78 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
   }
 
   return (
-    <Card className="overflow-hidden border-white/10 bg-[#161616]">
-      <div className="grid grid-cols-1 md:grid-cols-3 min-h-[70vh]">
-        <div
-          className={cn(
-            "border-r border-white/10 flex flex-col bg-[#141414]",
-            mobileChatOpen ? "hidden md:flex" : "flex"
-          )}
-        >
-          <div className="p-4 border-b border-white/10">
-            <h2 className="font-semibold text-white">Customers</h2>
-            <p className="text-xs text-muted-foreground">{conversations.length} active chat(s)</p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {conversations.map((conv) => {
-              const user = conv.user;
-              const isActive = conv.id === selectedId;
-              const meta = unreads[conv.id];
-              return (
-                <button
-                  key={conv.id}
-                  type="button"
-                  onClick={() => selectConversation(conv.id)}
-                  className={cn(
-                    "w-full text-left p-3 rounded-xl transition-colors border",
-                    isActive
-                      ? "bg-white/10 border-orange-500/30"
-                      : "border-transparent hover:bg-white/5"
-                  )}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className={cn(
-                        "w-2 h-2 rounded-full flex-shrink-0",
-                        user?.is_online ? "bg-green-400" : "bg-gray-500"
-                      )}
-                    />
-                    <span className="font-medium text-sm truncate text-white flex-1">
-                      {user?.full_name || "Customer"}
-                    </span>
-                    {meta?.lastMessageAt && (
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatRelativeTime(meta.lastMessageAt)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground truncate flex-1">
-                      {meta?.lastMessage ?? displayContact(user)}
-                    </p>
-                    <UnreadBadge count={meta?.unreadCount ?? 0} />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
-                    {displayContact(user)}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            "md:col-span-2 flex flex-col min-h-0",
-            !mobileChatOpen
-              ? "hidden md:flex md:min-h-[70vh]"
-              : "flex fixed inset-x-0 top-14 bottom-0 z-30 h-[calc(100dvh-3.5rem)] md:static md:z-auto md:inset-auto md:h-auto md:min-h-[70vh] bg-[#0f0f0f] md:bg-transparent overflow-hidden"
-          )}
-        >
-          <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden shrink-0"
-              onClick={() => setMobileChatOpen(false)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold truncate text-white">
-                {selected?.user?.full_name || "Customer"}
-              </h2>
-              <p className="text-xs text-muted-foreground truncate">
-                {displayContact(selected?.user)}
-              </p>
-            </div>
-            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
-              Live
-            </Badge>
-          </div>
-
+    <>
+      <Card className="overflow-hidden border-white/10 bg-[#161616]">
+        <div className="grid grid-cols-1 md:grid-cols-3 min-h-[60vh] md:min-h-[70vh]">
           <div
-            ref={scrollRef}
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-6 space-y-3 bg-[#0f0f0f]"
-          >
-            {messages.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No messages yet. Send a reply to start the conversation.
-              </p>
-            ) : (
-              messages.map((msg) => {
-                const isAdminMsg = msg.sender_id === adminId;
-                return (
-                  <div
-                    key={msg.id}
-                    className={cn("flex", isAdminMsg ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words",
-                        isAdminMsg
-                          ? "gradient-bg text-white rounded-br-md"
-                          : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
-                      )}
-                    >
-                      {!isAdminMsg && (
-                        <p className="text-[10px] font-semibold text-orange-400 mb-1">Customer</p>
-                      )}
-                      <ChatMessageContent message={msg} />
-                      <p className="text-[10px] opacity-60 mt-1.5">
-                        {formatRelativeTime(msg.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
+            className={cn(
+              "border-r border-white/10 flex flex-col bg-[#141414] min-h-[50vh] md:min-h-0",
+              mobileChatOpen ? "hidden md:flex" : "flex"
             )}
+          >
+            <div className="p-4 border-b border-white/10 shrink-0">
+              <h2 className="font-semibold text-white">Customers</h2>
+              <p className="text-xs text-muted-foreground">{conversations.length} active chat(s)</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {conversations.map((conv) => {
+                const user = conv.user;
+                const isActive = conv.id === selectedId;
+                const meta = unreads[conv.id];
+                return (
+                  <button
+                    key={conv.id}
+                    type="button"
+                    onClick={() => selectConversation(conv.id)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl transition-colors border",
+                      isActive
+                        ? "bg-white/10 border-orange-500/30"
+                        : "border-transparent hover:bg-white/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={cn(
+                          "w-2 h-2 rounded-full flex-shrink-0",
+                          user?.is_online ? "bg-green-400" : "bg-gray-500"
+                        )}
+                      />
+                      <span className="font-medium text-sm truncate text-white flex-1">
+                        {user?.full_name || "Customer"}
+                      </span>
+                      {meta?.lastMessageAt && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {formatRelativeTime(meta.lastMessageAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        {meta?.lastMessage ?? displayContact(user)}
+                      </p>
+                      <UnreadBadge count={meta?.unreadCount ?? 0} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
+                      {displayContact(user)}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <ChatComposer
-            value={input}
-            onChange={setInput}
-            onSend={handleSend}
-            loading={loading}
-            disabled={!selectedId}
-            placeholder="Type a message..."
-            showSendLabel
-            className="bg-[#121212] border-white/10"
-          />
+          {/* Desktop chat panel */}
+          <div className="hidden md:flex md:col-span-2 flex-col min-h-[70vh] min-h-0 overflow-hidden">
+            <ChatPanel />
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      {/* Mobile full-screen chat — portaled to body so composer is never clipped */}
+      <MobileChatShell open={mobileChatOpen && !!selectedId}>
+        <ChatPanel showMobileBack />
+      </MobileChatShell>
+    </>
   );
 }

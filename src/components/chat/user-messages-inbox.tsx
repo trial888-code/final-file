@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
+import { MobileChatShell } from "@/components/chat/mobile-chat-shell";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import {
   ensureUserConversation,
@@ -20,13 +22,6 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
-
-function messagePreview(msg: Message) {
-  if (msg.content.trim()) return msg.content;
-  if (msg.attachment_type === "image") return "Sent an image";
-  if (msg.attachment_type === "file") return "Sent a file";
-  return "Sent a message";
-}
 
 export function UserMessagesInbox() {
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
@@ -187,6 +182,96 @@ export function UserMessagesInbox() {
     return true;
   }
 
+  function ChatPanel({ showMobileBack }: { showMobileBack?: boolean }) {
+    if (!selectedConversation) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8 text-center">
+          <div>
+            <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Select a chat from the list to start messaging.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
+          {showMobileBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setMobileChatOpen(false)}
+              aria-label="Back to chats"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
+            <Headphones className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-white truncate">{selectedConversation.title}</h2>
+            <p className="text-xs text-muted-foreground truncate">{selectedConversation.subtitle}</p>
+          </div>
+          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
+            Live
+          </Badge>
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]"
+        >
+          {messages.length === 0 ? (
+            <div className="text-center py-12">
+              <MessageCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">
+                Say hello — our team typically replies in minutes.
+              </p>
+            </div>
+          ) : (
+            messages.map((msg) => {
+              const isOwn = msg.sender_id === userId;
+              return (
+                <div key={msg.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words",
+                      isOwn
+                        ? "gradient-bg text-white rounded-br-md"
+                        : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
+                    )}
+                  >
+                    {!isOwn && (
+                      <p className="text-[10px] font-semibold text-orange-400 mb-1">Support</p>
+                    )}
+                    <ChatMessageContent message={msg} />
+                    <p className="text-[10px] opacity-60 mt-1.5">
+                      {formatRelativeTime(msg.created_at)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <ChatComposer
+          value={input}
+          onChange={setInput}
+          onSend={handleSend}
+          loading={loading}
+          disabled={!selectedId}
+          placeholder="Type a message..."
+          showSendLabel
+          className="bg-[#121212] border-white/10"
+        />
+      </>
+    );
+  }
+
   if (initLoading) {
     return (
       <Card className="min-h-[70vh] flex items-center justify-center">
@@ -206,154 +291,74 @@ export function UserMessagesInbox() {
   }
 
   return (
-    <Card className="overflow-hidden border-white/10 bg-[#161616]">
-      <div className="grid grid-cols-1 md:grid-cols-3 min-h-[70vh]">
-        {/* Conversation list — Messenger style */}
-        <div
-          className={cn(
-            "border-r border-white/10 flex flex-col bg-[#141414]",
-            mobileChatOpen ? "hidden md:flex" : "flex"
-          )}
-        >
-          <div className="p-4 border-b border-white/10">
-            <h2 className="font-semibold text-white">Chats</h2>
-            <p className="text-xs text-muted-foreground">Your conversations</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {conversations.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8 px-4">
-                No chats yet. Start one with our support team below.
-              </p>
-            ) : (
-              conversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  type="button"
-                  onClick={() => selectConversation(conv.id)}
-                  className={cn(
-                    "w-full text-left p-3 rounded-xl transition-colors border",
-                    selectedId === conv.id
-                      ? "bg-white/10 border-orange-500/30"
-                      : "border-transparent hover:bg-white/5"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
-                      <Headphones className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <span className="font-semibold text-sm text-white truncate">{conv.title}</span>
-                        {conv.lastMessageAt && (
-                          <span className="text-[10px] text-muted-foreground shrink-0">
-                            {formatRelativeTime(conv.lastMessageAt)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground truncate flex-1">{conv.lastMessage}</p>
-                        <UnreadBadge count={conv.unreadCount} />
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))
+    <>
+      <Card className="overflow-hidden border-white/10 bg-[#161616]">
+        <div className="grid grid-cols-1 md:grid-cols-3 min-h-[60vh] md:min-h-[70vh]">
+          <div
+            className={cn(
+              "border-r border-white/10 flex flex-col bg-[#141414] min-h-[50vh] md:min-h-0",
+              mobileChatOpen ? "hidden md:flex" : "flex"
             )}
-          </div>
-        </div>
+          >
+            <div className="p-4 border-b border-white/10 shrink-0">
+              <h2 className="font-semibold text-white">Chats</h2>
+              <p className="text-xs text-muted-foreground">Your conversations</p>
+            </div>
 
-        {/* Active chat */}
-        <div
-          className={cn(
-            "md:col-span-2 flex flex-col min-h-0",
-            !mobileChatOpen
-              ? "hidden md:flex md:min-h-[70vh]"
-              : "flex fixed inset-x-0 top-14 bottom-0 z-30 h-[calc(100dvh-3.5rem)] md:static md:z-auto md:inset-auto md:h-auto md:min-h-[70vh] bg-[#0f0f0f] md:bg-transparent overflow-hidden"
-          )}
-        >
-          {selectedConversation ? (
-            <>
-              <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-[#121212]">
-                <button
-                  type="button"
-                  className="md:hidden p-2 rounded-lg hover:bg-white/10 text-muted-foreground"
-                  onClick={() => setMobileChatOpen(false)}
-                  aria-label="Back to chats"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
-                  <Headphones className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-white truncate">{selectedConversation.title}</h2>
-                  <p className="text-xs text-muted-foreground truncate">{selectedConversation.subtitle}</p>
-                </div>
-                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
-                  Live
-                </Badge>
-              </div>
-
-              <div
-                ref={scrollRef}
-                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-6 space-y-3 bg-[#0f0f0f]"
-              >
-                {messages.length === 0 ? (
-                  <div className="text-center py-12">
-                    <MessageCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">
-                      Say hello — our team typically replies in minutes.
-                    </p>
-                  </div>
-                ) : (
-                  messages.map((msg) => {
-                    const isOwn = msg.sender_id === userId;
-                    return (
-                      <div key={msg.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
-                        <div
-                        className={cn(
-                          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm break-words",
-                            isOwn
-                              ? "gradient-bg text-white rounded-br-md"
-                              : "bg-[#1e1e1e] text-foreground border border-white/5 rounded-bl-md"
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {conversations.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8 px-4">
+                  No chats yet. Start one with our support team below.
+                </p>
+              ) : (
+                conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    type="button"
+                    onClick={() => selectConversation(conv.id)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl transition-colors border",
+                      selectedId === conv.id
+                        ? "bg-white/10 border-orange-500/30"
+                        : "border-transparent hover:bg-white/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
+                        <Headphones className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="font-semibold text-sm text-white truncate">{conv.title}</span>
+                          {conv.lastMessageAt && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {formatRelativeTime(conv.lastMessageAt)}
+                            </span>
                           )}
-                        >
-                          {!isOwn && (
-                            <p className="text-[10px] font-semibold text-orange-400 mb-1">Support</p>
-                          )}
-                          <ChatMessageContent message={msg} />
-                          <p className="text-[10px] opacity-60 mt-1.5">
-                            {formatRelativeTime(msg.created_at)}
-                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground truncate flex-1">{conv.lastMessage}</p>
+                          <UnreadBadge count={conv.unreadCount} />
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <ChatComposer
-                value={input}
-                onChange={setInput}
-                onSend={handleSend}
-                loading={loading}
-                disabled={!selectedId}
-                placeholder="Type a message..."
-                showSendLabel
-                className="bg-[#121212] border-white/10"
-              />
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center p-8 text-center">
-              <div>
-                <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">Select a chat from the list to start messaging.</p>
-              </div>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
-          )}
+          </div>
+
+          {/* Desktop chat panel */}
+          <div className="hidden md:flex md:col-span-2 flex-col min-h-[70vh] min-h-0 overflow-hidden">
+            <ChatPanel />
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      {/* Mobile full-screen chat — portaled to body so composer is never clipped */}
+      <MobileChatShell open={mobileChatOpen && !!selectedConversation}>
+        <ChatPanel showMobileBack />
+      </MobileChatShell>
+    </>
   );
 }
