@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -15,6 +15,12 @@ interface PrizeWheelProps {
   onSpinComplete: (remaining: number) => void;
 }
 
+interface WheelRadii {
+  emoji: number;
+  label: number;
+  rim: number;
+}
+
 function formatCountdown(ms: number) {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -23,6 +29,17 @@ function formatCountdown(ms: number) {
 }
 
 const RIM_DOTS = 24;
+const DEFAULT_RADII: WheelRadii = { emoji: 158, label: 118, rim: 188 };
+
+function measureRadii(width: number): WheelRadii {
+  const padding = width >= 520 ? 36 : 20;
+  const innerRadius = width / 2 - padding / 2;
+  return {
+    emoji: Math.round(innerRadius * 0.88),
+    label: Math.round(innerRadius * 0.66),
+    rim: Math.round(width / 2 - 4),
+  };
+}
 
 export function PrizeWheel({
   isLoggedIn,
@@ -30,9 +47,30 @@ export function PrizeWheel({
   nextFreeSpinMs,
   onSpinComplete,
 }: PrizeWheelProps) {
+  const outerRef = useRef<HTMLDivElement>(null);
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [countdown, setCountdown] = useState(nextFreeSpinMs);
+  const [radii, setRadii] = useState<WheelRadii>(DEFAULT_RADII);
+
+  useLayoutEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const width = el.getBoundingClientRect().width;
+      if (width > 0) setRadii(measureRadii(width));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
   useEffect(() => {
     if (!countdown || countdown <= 0) return;
@@ -96,28 +134,29 @@ export function PrizeWheel({
       <div className="prize-wheel-stage relative flex items-center justify-center">
         <div className="absolute inset-0 prize-wheel-glow rounded-full blur-3xl scale-90" />
 
-        {/* Pointer at 12 o'clock */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-30 prize-wheel-pointer">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-30 prize-wheel-pointer scale-75 sm:scale-100 origin-top">
           <div className="w-0 h-0 border-l-[18px] border-r-[18px] border-t-[30px] border-l-transparent border-r-transparent border-t-amber-400" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[22px] border-l-transparent border-r-transparent border-t-amber-200" />
         </div>
 
-        <div className="prize-wheel-outer relative w-[min(92vw,440px)] h-[min(92vw,440px)] sm:w-[520px] sm:h-[520px] lg:w-[580px] lg:h-[580px] rounded-full p-[14px] sm:p-[18px]">
+        <div
+          ref={outerRef}
+          className="prize-wheel-outer relative w-[min(96vw,400px)] h-[min(96vw,400px)] sm:w-[520px] sm:h-[520px] lg:w-[580px] lg:h-[580px] rounded-full p-[10px] sm:p-[18px]"
+        >
           <div className="absolute inset-0 pointer-events-none z-10">
             {Array.from({ length: RIM_DOTS }).map((_, i) => (
               <span
                 key={i}
                 className="prize-wheel-dot absolute left-1/2 top-1/2 w-2 h-2 -ml-1 -mt-1 rounded-full"
                 style={{
-                  transform: `rotate(${i * (360 / RIM_DOTS)}deg) translateY(calc(-1 * var(--wheel-rim-radius)))`,
+                  transform: `rotate(${i * (360 / RIM_DOTS)}deg) translateY(-${radii.rim}px)`,
                 }}
               />
             ))}
           </div>
 
-          {/* Segment dividers at boundaries */}
           <svg
-            className="absolute inset-[14px] sm:inset-[18px] z-20 pointer-events-none rounded-full"
+            className="absolute inset-[10px] sm:inset-[18px] z-20 pointer-events-none rounded-full"
             viewBox="0 0 100 100"
           >
             {WHEEL_PRIZES.map((_, i) => {
@@ -151,14 +190,13 @@ export function PrizeWheel({
               return (
                 <div
                   key={prize.id}
-                  className="absolute left-1/2 top-1/2 z-[1]"
+                  className="absolute left-1/2 top-1/2 w-0 h-0 z-[1]"
                   style={{ transform: `rotate(${angle}deg)` }}
                 >
                   <div
-                    className="absolute flex flex-col items-center justify-center gap-1 text-center"
+                    className="absolute left-0 top-0"
                     style={{
-                      transform: `translate(-50%, calc(-1 * var(--wheel-label-radius))) rotate(-${angle}deg)`,
-                      width: prize.type === "luck" ? "96px" : "88px",
+                      transform: `translate(-50%, -${radii.emoji}px) rotate(-${angle}deg)`,
                     }}
                   >
                     <div
@@ -178,15 +216,33 @@ export function PrizeWheel({
                         {prize.emoji}
                       </span>
                     </div>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "absolute left-0 top-0 text-center",
+                      prize.type === "luck" ? "w-[52px] sm:w-[88px]" : "w-[44px] sm:w-[72px]"
+                    )}
+                    style={{
+                      transform: `translate(-50%, -${radii.label}px) rotate(-${angle}deg)`,
+                    }}
+                  >
                     <span
                       className={cn(
-                        "font-extrabold text-amber-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] tracking-wide leading-tight",
+                        "font-extrabold text-amber-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] tracking-wide leading-tight block",
                         prize.type === "luck"
-                          ? "text-[7px] sm:text-[8px] uppercase"
-                          : "text-[11px] sm:text-xs"
+                          ? "text-[5px] sm:text-[8px] uppercase"
+                          : "text-[8px] sm:text-xs"
                       )}
                     >
-                      {prize.label}
+                      {prize.type === "luck" ? (
+                        <>
+                          <span className="block leading-[1.1]">Better Luck</span>
+                          <span className="block leading-[1.1]">Next Time</span>
+                        </>
+                      ) : (
+                        prize.label
+                      )}
                     </span>
                   </div>
                 </div>
@@ -195,22 +251,22 @@ export function PrizeWheel({
           </motion.div>
 
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-            <div className="prize-wheel-hub w-[120px] h-[88px] sm:w-[140px] sm:h-[100px] lg:w-[156px] lg:h-[110px] rounded-2xl flex flex-col items-center justify-center text-center px-3">
+            <div className="prize-wheel-hub w-[76px] h-[58px] sm:w-[140px] sm:h-[100px] lg:w-[156px] lg:h-[110px] rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-center px-1.5 sm:px-3">
               {remainingSpins > 0 ? (
                 <>
-                  <span className="text-[10px] sm:text-xs text-amber-200/60 uppercase tracking-wider">
+                  <span className="text-[7px] sm:text-xs text-amber-200/60 uppercase tracking-wider">
                     Spins left
                   </span>
-                  <span className="text-2xl sm:text-3xl font-black text-amber-400 prize-wheel-hub-glow">
+                  <span className="text-lg sm:text-3xl font-black text-amber-400 prize-wheel-hub-glow">
                     {remainingSpins}
                   </span>
                 </>
               ) : countdown && countdown > 0 ? (
                 <>
-                  <span className="text-[9px] sm:text-[10px] text-amber-200/60 leading-tight">
-                    Next free spin in
+                  <span className="text-[7px] sm:text-[10px] text-amber-200/60 leading-tight px-0.5">
+                    Next spin in
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-amber-400 leading-tight mt-1 prize-wheel-hub-glow">
+                  <span className="text-[8px] sm:text-sm font-bold text-amber-400 leading-tight mt-0.5 sm:mt-1 prize-wheel-hub-glow">
                     {formatCountdown(countdown)}
                   </span>
                 </>

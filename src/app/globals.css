@@ -477,9 +477,9 @@ body {
 }
 
 .prize-wheel-stage {
-  min-height: min(92vw, 440px);
+  min-height: min(96vw, 400px);
   width: 100%;
-  padding-top: 24px;
+  padding-top: 20px;
 }
 
 @media (min-width: 640px) {
@@ -500,28 +500,12 @@ body {
 }
 
 .prize-wheel-outer {
-  --wheel-rim-radius: calc(min(92vw, 440px) / 2 - 4px);
-  --wheel-label-radius: calc(min(92vw, 440px) / 2 * 0.62);
   background: linear-gradient(145deg, #fbbf24 0%, #d97706 30%, #92400e 60%, #fbbf24 100%);
   box-shadow:
     0 0 60px rgba(251, 191, 36, 0.35),
     0 0 120px rgba(124, 58, 237, 0.2),
     inset 0 2px 4px rgba(255, 255, 255, 0.3),
     inset 0 -2px 4px rgba(0, 0, 0, 0.4);
-}
-
-@media (min-width: 640px) {
-  .prize-wheel-outer {
-    --wheel-rim-radius: 252px;
-    --wheel-label-radius: 158px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .prize-wheel-outer {
-    --wheel-rim-radius: 282px;
-    --wheel-label-radius: 176px;
-  }
 }
 
 .prize-wheel-dot {
@@ -556,22 +540,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
+  width: 2.35rem;
+  height: 2.35rem;
   border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.35) 70%);
   box-shadow:
-    0 0 0 2px rgba(251, 191, 36, 0.25),
+    0 0 0 1.5px rgba(251, 191, 36, 0.25),
     inset 0 2px 8px rgba(255, 255, 255, 0.08),
     0 4px 12px rgba(0, 0, 0, 0.45);
 }
 
 .prize-wheel-emoji-wrap--jackpot {
-  width: 3.75rem;
-  height: 3.75rem;
+  width: 2.65rem;
+  height: 2.65rem;
   background: radial-gradient(circle at 30% 30%, rgba(168, 85, 247, 0.35), rgba(0, 0, 0, 0.4) 70%);
   box-shadow:
-    0 0 0 2px rgba(251, 191, 36, 0.55),
+    0 0 0 1.5px rgba(251, 191, 36, 0.55),
     0 0 18px rgba(168, 85, 247, 0.45),
     inset 0 2px 10px rgba(255, 255, 255, 0.12);
   animation: prize-emoji-pulse 2s ease-in-out infinite;
@@ -590,7 +574,7 @@ body {
 }
 
 .prize-wheel-emoji {
-  font-size: 1.85rem;
+  font-size: 1.3rem;
   line-height: 1;
   user-select: none;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
@@ -598,7 +582,7 @@ body {
 }
 
 .prize-wheel-emoji-wrap--jackpot .prize-wheel-emoji {
-  font-size: 2.15rem;
+  font-size: 1.5rem;
   filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 }
 
@@ -606,11 +590,19 @@ body {
   .prize-wheel-emoji-wrap {
     width: 3.75rem;
     height: 3.75rem;
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.25),
+      inset 0 2px 8px rgba(255, 255, 255, 0.08),
+      0 4px 12px rgba(0, 0, 0, 0.45);
   }
 
   .prize-wheel-emoji-wrap--jackpot {
     width: 4.25rem;
     height: 4.25rem;
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.55),
+      0 0 18px rgba(168, 85, 247, 0.45),
+      inset 0 2px 10px rgba(255, 255, 255, 0.12);
   }
 
   .prize-wheel-emoji {
