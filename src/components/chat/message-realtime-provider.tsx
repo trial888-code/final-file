@@ -21,7 +21,7 @@ import {
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { createClientId } from "@/lib/utils";
 import {
-  playMessageNotificationSound,
+  playIncomingMessageSound,
   unlockMessageNotificationSound,
 } from "@/lib/chat/message-notification-sound";
 import type { Message } from "@/types/database";
@@ -60,18 +60,22 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [popup, setPopup] = useState<IncomingPopup | null>(null);
+  const [conversationIds, setConversationIds] = useState<string[]>([]);
   const userIdRef = useRef<string | null>(null);
   const isAdminRef = useRef(false);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refresh = useCallback(async () => {
+  const syncConversations = useCallback(async () => {
     const supabase = createClient();
     if (!supabase) return;
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (!user) {
+      userIdRef.current = null;
+      setConversationIds([]);
       setCount(0);
       setIsAdmin(false);
       setIsLoggedIn(false);
@@ -79,7 +83,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoggedIn(true);
-
     userIdRef.current = user.id;
 
     const { data: profile } = await supabase
@@ -92,9 +95,24 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     setIsAdmin(admin);
     isAdminRef.current = admin;
 
+    const query = admin
+      ? supabase.from("conversations").select("id").eq("is_active", true)
+      : supabase
+          .from("conversations")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true);
+
+    const { data: conversations } = await query;
+    setConversationIds(conversations?.map((c) => c.id) ?? []);
+
     const total = admin ? await getAdminUnreadMessageCount() : await getUnreadMessageCount();
     setCount(total);
   }, []);
+
+  const refresh = useCallback(async () => {
+    await syncConversations();
+  }, [syncConversations]);
 
   const showPopup = useCallback(
     async (msg: Message) => {
@@ -131,17 +149,42 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     [pathname]
   );
 
+  const handleIncomingMessage = useCallback(
+    (msg: Message) => {
+      playIncomingMessageSound(msg.sender_id, userIdRef.current);
+      void refresh();
+      void showPopup(msg);
+    },
+    [refresh, showPopup]
+  );
+
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    void syncConversations();
+
+    const interval = setInterval(() => {
+      void syncConversations();
+    }, 25_000);
+
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        void syncConversations();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [syncConversations]);
 
   useEffect(() => {
     function unlock() {
       void unlockMessageNotificationSound();
     }
-    window.addEventListener("click", unlock, { once: true });
-    window.addEventListener("touchstart", unlock, { once: true, passive: true });
-    window.addEventListener("keydown", unlock, { once: true });
+    window.addEventListener("click", unlock);
+    window.addEventListener("touchstart", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
     return () => {
       window.removeEventListener("click", unlock);
       window.removeEventListener("touchstart", unlock);
@@ -151,78 +194,32 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase || !userIdRef.current || conversationIds.length === 0) return;
 
-    let cancelled = false;
-    const channels: ReturnType<typeof supabase.channel>[] = [];
-
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
-
-      userIdRef.current = user.id;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      const admin = profile?.role === "admin";
-      isAdminRef.current = admin;
-      setIsAdmin(admin);
-
-      const query = admin
-        ? supabase.from("conversations").select("id").eq("is_active", true)
-        : supabase
-            .from("conversations")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("is_active", true);
-
-      const { data: conversations } = await query;
-      if (!conversations?.length) return;
-
-      for (const conv of conversations) {
-        if (cancelled) break;
-
-        const channel = supabase
-          .channel(`msg-rt-${user.id}-${conv.id}-${createClientId()}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "messages",
-              filter: `conversation_id=eq.${conv.id}`,
-            },
-            (payload) => {
-              const msg = payload.new as Message;
-              if (msg.sender_id === user.id) return;
-
-              playMessageNotificationSound();
-              void refresh();
-              void showPopup(msg);
-            }
-          )
-          .subscribe();
-
-        if (cancelled) {
-          supabase.removeChannel(channel);
-        } else {
-          channels.push(channel);
-        }
-      }
-    })();
+    const userId = userIdRef.current;
+    const channels = conversationIds.map((convId) =>
+      supabase
+        .channel(`msg-rt-${userId}-${convId}-${createClientId()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${convId}`,
+          },
+          (payload) => {
+            handleIncomingMessage(payload.new as Message);
+          }
+        )
+        .subscribe()
+    );
 
     return () => {
-      cancelled = true;
       for (const ch of channels) supabase.removeChannel(ch);
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
     };
-  }, [refresh, showPopup]);
+  }, [conversationIds, handleIncomingMessage]);
 
   function openChat() {
     setPopup(null);
@@ -239,7 +236,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     <MessageRealtimeContext.Provider value={{ count, isAdmin, refresh }}>
       {children}
 
-      {/* Floating chat button — users & admins */}
       {!hideFab && isLoggedIn && (
         <Link
           href={chatHref}

@@ -11,7 +11,7 @@ import { sendUserMessage, markConversationRead } from "@/lib/actions/messages";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
 import { formatRelativeTime } from "@/lib/utils";
-import { playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
+import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import type { Message } from "@/types/database";
 
@@ -103,7 +103,7 @@ export function ChatWidget() {
           const msg = payload.new as Message;
           setMessages((prev) => [...prev, msg]);
           if (userId && msg.sender_id !== userId) {
-            playMessageNotificationSound();
+            playIncomingMessageSound(msg.sender_id, userId);
           }
         }
       )

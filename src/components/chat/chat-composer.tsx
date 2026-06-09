@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getAttachmentType, resolveFileMimeType } from "@/lib/chat/attachments";
+import { unlockMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 
 interface ChatComposerProps {
   value: string;
@@ -127,6 +128,7 @@ export function ChatComposer({
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={() => void unlockMessageNotificationSound()}
           placeholder={placeholder}
           disabled={disabled || loading}
           className="min-w-0 w-full h-11 text-base sm:text-sm"

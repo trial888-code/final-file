@@ -15,7 +15,6 @@ import { AdminUserSearch } from "@/components/admin/admin-user-search";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { cn, formatRelativeTime, createClientId } from "@/lib/utils";
-import { playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
@@ -230,7 +229,6 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
           (payload) => {
             const msg = payload.new as Message;
             if (msg.sender_id === adminId) return;
-            playMessageNotificationSound();
             void loadUnreads();
             if (conv.id === selectedId) {
               setMessages((prev) =>
