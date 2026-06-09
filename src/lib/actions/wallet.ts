@@ -143,7 +143,7 @@ export async function adminGrantWallet(
   );
 
   if (result.success) {
-    const label = walletType === "bonus" ? "Bonus Wallet" : "Current Wallet";
+    const label = walletType === "bonus" ? "Bonus Wallet" : "Total Deposit";
     await createNotification(
       userId,
       "Wallet Updated",

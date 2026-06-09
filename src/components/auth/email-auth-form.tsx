@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthCallbackUrlWithRef } from "@/lib/auth/callback-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,11 +43,14 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
         return;
       }
       toast.success("Welcome back!");
+      router.push(redirect);
+      router.refresh();
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: getAuthCallbackUrlWithRef(redirect, referralCode || referralCodeFromUrl),
           data: {
             full_name: fullName,
             referral_code: referralCode.trim() || referralCodeFromUrl || undefined,
@@ -59,11 +63,16 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
         toast.error(error.message);
         return;
       }
-      toast.success("Account created! Welcome to Spinora.");
-    }
 
-    router.push(redirect);
-    router.refresh();
+      if (data.session) {
+        toast.success("Account created! Welcome to Spinora.");
+        router.push(redirect);
+        router.refresh();
+        return;
+      }
+
+      toast.success("Account created! Check your email to verify, then sign in.");
+    }
   }
 
   return (

@@ -19,6 +19,7 @@ import {
 } from "@/lib/actions/messages";
 import { useUnreadMessages } from "@/components/chat/message-realtime-provider";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
@@ -228,6 +229,7 @@ export function UserMessagesInbox() {
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
 
           if (userId && msg.sender_id !== userId) {
+            playMessageNotificationSound();
             if (mobileChatOpen || window.matchMedia("(min-width: 768px)").matches) {
               void markConversationRead(selectedId).then(() => {
                 refreshUnread();

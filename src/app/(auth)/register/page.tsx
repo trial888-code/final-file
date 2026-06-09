@@ -31,7 +31,11 @@ function RegisterForm() {
         )}
         {method === "gmail" && (
           <div className="space-y-4">
-            <GoogleAuthButton redirect="/" label="Sign up with Google" />
+            <GoogleAuthButton
+              redirect="/"
+              referralCode={refFromUrl}
+              label="Sign up with Google"
+            />
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-white/10" />

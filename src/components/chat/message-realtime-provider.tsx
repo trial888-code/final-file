@@ -19,6 +19,11 @@ import {
   getUnreadMessageCount,
 } from "@/lib/actions/messages";
 import { UnreadBadge } from "@/components/ui/unread-badge";
+import { createClientId } from "@/lib/utils";
+import {
+  playMessageNotificationSound,
+  unlockMessageNotificationSound,
+} from "@/lib/chat/message-notification-sound";
 import type { Message } from "@/types/database";
 
 interface IncomingPopup {
@@ -131,6 +136,20 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
+    function unlock() {
+      void unlockMessageNotificationSound();
+    }
+    window.addEventListener("click", unlock, { once: true });
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
 
@@ -167,8 +186,10 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       if (!conversations?.length) return;
 
       for (const conv of conversations) {
+        if (cancelled) break;
+
         const channel = supabase
-          .channel(`msg-rt-${user.id}-${conv.id}`)
+          .channel(`msg-rt-${user.id}-${conv.id}-${createClientId()}`)
           .on(
             "postgres_changes",
             {
@@ -181,13 +202,18 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
               const msg = payload.new as Message;
               if (msg.sender_id === user.id) return;
 
+              playMessageNotificationSound();
               void refresh();
               void showPopup(msg);
             }
           )
           .subscribe();
 
-        channels.push(channel);
+        if (cancelled) {
+          supabase.removeChannel(channel);
+        } else {
+          channels.push(channel);
+        }
       }
     })();
 
@@ -217,6 +243,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       {!hideFab && isLoggedIn && (
         <Link
           href={chatHref}
+          onClick={() => void unlockMessageNotificationSound()}
           className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 rounded-full gradient-bg flex items-center justify-center shadow-lg glow-purple"
           aria-label={isAdmin ? "Open customer chat" : "Open messages"}
         >

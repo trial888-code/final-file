@@ -25,7 +25,7 @@ export function WalletCard({ walletBalance, bonusWallet, className }: WalletCard
 
       <div className="wallet-card-body grid grid-cols-2 divide-x divide-white/10 pt-6 pb-4 px-2">
         <div className="text-center px-2">
-          <p className="text-[11px] text-white/70 mb-1">Current Wallet</p>
+          <p className="text-[11px] text-white/70 mb-1">Total Deposit</p>
           <p className="text-xl sm:text-2xl font-bold text-amber-400 tabular-nums">
             {formatMoney(walletBalance)}
           </p>

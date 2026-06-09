@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Bell, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationsRead } from "@/lib/actions/notifications";
-import { formatRelativeTime, cn } from "@/lib/utils";
+import { formatRelativeTime, cn, createClientId } from "@/lib/utils";
 
 interface NotificationItem {
   id: string;
@@ -36,6 +36,7 @@ export function NotificationDropdown({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -59,6 +60,7 @@ export function NotificationDropdown({
       data: { user },
     } = await supabase.auth.getUser();
     setIsLoggedIn(!!user);
+    setUserId(user?.id ?? null);
     if (!user) return;
 
     setLoading(true);
@@ -82,40 +84,31 @@ export function NotificationDropdown({
   }, [fetchNotifications]);
 
   useEffect(() => {
+    if (!userId) return;
+
     const supabase = createClient();
     if (!supabase) return;
 
-    let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
-
-      channel = supabase
-        .channel(`notifications-${user.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "notifications",
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            fetchNotifications();
-          }
-        )
-        .subscribe();
-    })();
+    const channel = supabase
+      .channel(`notifications-${userId}-${createClientId()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
 
     return () => {
-      cancelled = true;
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, [fetchNotifications]);
+  }, [userId, fetchNotifications]);
 
   useEffect(() => {
     if (!open) return;

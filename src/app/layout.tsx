@@ -19,13 +19,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <OrganizationSchema />
         <WebsiteSchema />
         <link rel="icon" href="/logo.jpeg" />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <MessageRealtimeProvider>
           {children}
           <ChatWidgetLoader />

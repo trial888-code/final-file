@@ -5,15 +5,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
-import { sendAdminMessage } from "@/lib/actions/admin";
+import { sendAdminMessage, ensureAdminConversation } from "@/lib/actions/admin";
 import { getAdminConversationUnreads, type AdminConversationUnread } from "@/lib/actions/messages";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
 import { MobileChatShell } from "@/components/chat/mobile-chat-shell";
+import { AdminUserSearch } from "@/components/admin/admin-user-search";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime, createClientId } from "@/lib/utils";
+import { playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
@@ -33,6 +35,7 @@ export interface AdminConversation {
 
 interface AdminChatInboxProps {
   conversations: AdminConversation[];
+  initialUserId?: string;
 }
 
 function displayContact(user: ConversationUser | null | undefined) {
@@ -149,7 +152,7 @@ function AdminChatPanel({
   );
 }
 
-export function AdminChatInbox({ conversations: initialConversations }: AdminChatInboxProps) {
+export function AdminChatInbox({ conversations: initialConversations, initialUserId }: AdminChatInboxProps) {
   const [conversations, setConversations] = useState(initialConversations);
   const [unreads, setUnreads] = useState<Record<string, AdminConversationUnread>>({});
   const [selectedId, setSelectedId] = useState(initialConversations[0]?.id ?? "");
@@ -159,6 +162,7 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
   const [loading, setLoading] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initialUserHandled = useRef(false);
   const supabase = useMemo(() => createClient(), []);
   const { refresh: refreshGlobalUnread } = useUnreadMessages();
 
@@ -214,7 +218,7 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
 
     for (const conv of conversations) {
       const channel = supabase
-        .channel(`admin-list-${conv.id}`)
+        .channel(`admin-list-${conv.id}-${createClientId()}`)
         .on(
           "postgres_changes",
           {
@@ -226,6 +230,7 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
           (payload) => {
             const msg = payload.new as Message;
             if (msg.sender_id === adminId) return;
+            playMessageNotificationSound();
             void loadUnreads();
             if (conv.id === selectedId) {
               setMessages((prev) =>
@@ -257,6 +262,48 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
     setSelectedId(id);
     setMobileChatOpen(true);
   }
+
+  const startChatWithUser = useCallback(
+    async (userId: string) => {
+      const existing = conversations.find((c) => c.user_id === userId);
+      if (existing) {
+        selectConversation(existing.id);
+        return;
+      }
+
+      try {
+        const { conversationId, user, error } = await ensureAdminConversation(userId);
+        if (error || !conversationId) {
+          toast.error(error ?? "Could not start chat");
+          return;
+        }
+
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === conversationId)) return prev;
+          return [
+            {
+              id: conversationId,
+              user_id: userId,
+              updated_at: new Date().toISOString(),
+              user: user ?? null,
+            },
+            ...prev,
+          ];
+        });
+
+        selectConversation(conversationId);
+      } catch {
+        toast.error("Could not start chat. Try again.");
+      }
+    },
+    [conversations]
+  );
+
+  useEffect(() => {
+    if (!initialUserId || initialUserHandled.current) return;
+    initialUserHandled.current = true;
+    void startChatWithUser(initialUserId);
+  }, [initialUserId, startChatWithUser]);
 
   async function handleSend(file: File | null): Promise<boolean> {
     if ((!input.trim() && !file) || !selectedId) return false;
@@ -314,17 +361,69 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
     scrollRef,
   };
 
-  if (conversations.length === 0) {
-    return (
-      <Card className="p-12 text-center">
-        <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="font-semibold mb-2">No customer chats yet</h3>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          When customers message you on the website, their conversations will appear here.
-        </p>
-      </Card>
-    );
-  }
+  const customerList = (
+    <>
+      <div className="p-3 sm:p-4 border-b border-white/10 shrink-0 space-y-3">
+        <div>
+          <h2 className="font-semibold text-white">Customers</h2>
+          <p className="text-xs text-muted-foreground">{conversations.length} active chat(s)</p>
+        </div>
+        <AdminUserSearch onStartChat={startChatWithUser} />
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {conversations.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8 px-3">
+            Search for a user above to start a conversation.
+          </p>
+        ) : (
+          conversations.map((conv) => {
+            const user = conv.user;
+            const isActive = conv.id === selectedId;
+            const meta = unreads[conv.id];
+            return (
+              <button
+                key={conv.id}
+                type="button"
+                onClick={() => selectConversation(conv.id)}
+                className={cn(
+                  "w-full text-left p-3 rounded-xl transition-colors border",
+                  isActive
+                    ? "bg-white/10 border-orange-500/30"
+                    : "border-transparent hover:bg-white/5"
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full flex-shrink-0",
+                      user?.is_online ? "bg-green-400" : "bg-gray-500"
+                    )}
+                  />
+                  <span className="font-medium text-sm truncate text-white flex-1">
+                    {user?.full_name || "Customer"}
+                  </span>
+                  {meta?.lastMessageAt && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {formatRelativeTime(meta.lastMessageAt)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground truncate flex-1">
+                    {meta?.lastMessage ?? displayContact(user)}
+                  </p>
+                  <UnreadBadge count={meta?.unreadCount ?? 0} />
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
+                  {displayContact(user)}
+                </p>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
 
   return (
     <>
@@ -336,61 +435,23 @@ export function AdminChatInbox({ conversations: initialConversations }: AdminCha
               mobileChatOpen ? "hidden md:flex" : "flex"
             )}
           >
-            <div className="p-4 border-b border-white/10 shrink-0">
-              <h2 className="font-semibold text-white">Customers</h2>
-              <p className="text-xs text-muted-foreground">{conversations.length} active chat(s)</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {conversations.map((conv) => {
-                const user = conv.user;
-                const isActive = conv.id === selectedId;
-                const meta = unreads[conv.id];
-                return (
-                  <button
-                    key={conv.id}
-                    type="button"
-                    onClick={() => selectConversation(conv.id)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl transition-colors border",
-                      isActive
-                        ? "bg-white/10 border-orange-500/30"
-                        : "border-transparent hover:bg-white/5"
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={cn(
-                          "w-2 h-2 rounded-full flex-shrink-0",
-                          user?.is_online ? "bg-green-400" : "bg-gray-500"
-                        )}
-                      />
-                      <span className="font-medium text-sm truncate text-white flex-1">
-                        {user?.full_name || "Customer"}
-                      </span>
-                      {meta?.lastMessageAt && (
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {formatRelativeTime(meta.lastMessageAt)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground truncate flex-1">
-                        {meta?.lastMessage ?? displayContact(user)}
-                      </p>
-                      <UnreadBadge count={meta?.unreadCount ?? 0} />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
-                      {displayContact(user)}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+            {customerList}
           </div>
 
           {/* Desktop chat panel */}
           <div className="hidden md:flex md:col-span-2 flex-col min-h-[70vh] min-h-0 overflow-hidden">
-            <AdminChatPanel {...chatPanelProps} />
+            {selectedId ? (
+              <AdminChatPanel {...chatPanelProps} />
+            ) : (
+              <div className="flex-1 flex items-center justify-center p-8 text-center">
+                <div>
+                  <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    Search for a user or pick a chat to start messaging.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Card>

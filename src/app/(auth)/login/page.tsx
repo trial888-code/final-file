@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AuthMethodPicker, type AuthMethod } from "@/components/auth/auth-method-picker";
 import { OtpAuthForm } from "@/components/auth/otp-auth-form";
@@ -13,6 +14,12 @@ function LoginForm() {
   const [method, setMethod] = useState<AuthMethod>("phone");
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
+
+  useEffect(() => {
+    if (searchParams.get("error") === "auth_callback_failed") {
+      toast.error("Google sign-in failed. Check Supabase Google provider and redirect URLs.");
+    }
+  }, [searchParams]);
 
   return (
     <Card>

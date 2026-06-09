@@ -12,19 +12,32 @@ const statusVariant: Record<RequestStatus, "default" | "warning" | "success" | "
   rejected: "destructive",
 };
 
-export default async function AdminRequestsPage() {
+export default async function AdminRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
   const supabase = await createClient();
 
-  const { data: requests } = await supabase
+  let query = supabase
     .from("game_requests")
     .select("*, user:profiles!game_requests_user_id_fkey(full_name, email)")
     .order("created_at", { ascending: false });
 
+  if (status === "pending") {
+    query = query.eq("status", "pending");
+  }
+
+  const { data: requests } = await query;
+
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Game Requests</h1>
-        <p className="text-muted-foreground">Manage and process game account requests</p>
+        <p className="text-muted-foreground text-sm sm:text-base">
+          {status === "pending" ? "Showing pending requests only" : "Manage and process game account requests"}
+        </p>
       </div>
 
       <div className="space-y-4">

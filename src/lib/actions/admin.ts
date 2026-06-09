@@ -119,3 +119,128 @@ export async function sendAdminMessage(
   revalidatePath("/admin/chat");
   return { success: true };
 }
+
+export interface AdminUserSearchResult {
+  id: string;
+  full_name: string | null;
+  email: string;
+  phone: string | null;
+  whatsapp: string | null;
+  conversationId: string | null;
+}
+
+async function requireAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" as const, supabase, user: null };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin") return { error: "Unauthorized" as const, supabase, user: null };
+  return { supabase, user, error: null };
+}
+
+export async function searchUsersForAdmin(query: string): Promise<{
+  users?: AdminUserSearchResult[];
+  error?: string;
+}> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return { users: [] };
+
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error, users: [] };
+
+  const pattern = `"%${trimmed.replace(/"/g, '""')}%"`;
+  const { data: users, error } = await auth.supabase
+    .from("profiles")
+    .select("id, full_name, email, phone, whatsapp, role")
+    .eq("role", "user")
+    .or(
+      `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},whatsapp.ilike.${pattern}`
+    )
+    .order("created_at", { ascending: false })
+    .limit(15);
+
+  if (error) return { error: error.message, users: [] };
+  if (!users?.length) return { users: [] };
+
+  const userIds = users.map((u) => u.id);
+  const { data: conversations } = await auth.supabase
+    .from("conversations")
+    .select("id, user_id")
+    .in("user_id", userIds)
+    .eq("is_active", true);
+
+  const convByUser = new Map(conversations?.map((c) => [c.user_id, c.id]) ?? []);
+
+  return {
+    users: users.map((u) => ({
+      id: u.id,
+      full_name: u.full_name,
+      email: u.email,
+      phone: u.phone,
+      whatsapp: u.whatsapp,
+      conversationId: convByUser.get(u.id) ?? null,
+    })),
+  };
+}
+
+export async function ensureAdminConversation(targetUserId: string): Promise<{
+  conversationId?: string;
+  user?: { full_name: string | null; email: string; is_online?: boolean };
+  error?: string;
+}> {
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+
+  const { data: targetUser } = await auth.supabase
+    .from("profiles")
+    .select("id, role, full_name, email, is_online")
+    .eq("id", targetUserId)
+    .single();
+
+  if (!targetUser) return { error: "User not found" };
+  if (targetUser.role === "admin") return { error: "Cannot start a chat with an admin account" };
+
+  const { data: existing } = await auth.supabase
+    .from("conversations")
+    .select("id")
+    .eq("user_id", targetUserId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      conversationId: existing.id,
+      user: {
+        full_name: targetUser.full_name,
+        email: targetUser.email,
+        is_online: targetUser.is_online,
+      },
+    };
+  }
+
+  const { data: created, error } = await auth.supabase
+    .from("conversations")
+    .insert({ user_id: targetUserId, admin_id: auth.user!.id })
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/chat");
+  return {
+    conversationId: created.id,
+    user: {
+      full_name: targetUser.full_name,
+      email: targetUser.email,
+      is_online: targetUser.is_online,
+    },
+  };
+}

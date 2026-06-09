@@ -26,7 +26,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("grant");
     const result = await adminGrantWallet(userId, value, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`Added $${value} to ${walletType} wallet`);
+    else toast.success(`Added $${value} to ${walletType === "bonus" ? "bonus" : "total deposit"}`);
     router.refresh();
     setLoading(null);
   }
@@ -40,7 +40,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("deduct");
     const result = await adminDeductWallet(userId, value, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`Removed $${value} from ${walletType} wallet`);
+    else toast.success(`Removed $${value} from ${walletType === "bonus" ? "bonus" : "total deposit"}`);
     router.refresh();
     setLoading(null);
   }
@@ -49,7 +49,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("reset");
     const result = await adminResetWallet(userId, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`${walletType === "bonus" ? "Bonus" : "Current"} wallet reset to $0`);
+    else toast.success(`${walletType === "bonus" ? "Bonus" : "Total Deposit"} reset to $0`);
     router.refresh();
     setLoading(null);
   }
@@ -76,7 +76,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
             className="h-8 rounded-md border border-border bg-background px-2 text-sm"
           >
             <option value="bonus">Bonus</option>
-            <option value="current">Current</option>
+            <option value="current">Total Deposit</option>
           </select>
         </div>
         <Button size="sm" variant="outline" onClick={handleGrant} disabled={!!loading}>
