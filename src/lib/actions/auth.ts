@@ -133,10 +133,23 @@ export async function isEmailAvailable(
 async function waitForProfileRow(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
-  attempts = 12
+  attempts = 20
 ): Promise<boolean> {
   for (let i = 0; i < attempts; i++) {
     const { data } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+    if (data) return true;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
+async function waitForProfileRowSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  attempts = 20
+): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    const { data } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
     if (data) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -149,18 +162,23 @@ async function persistContactOnProfile(
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdminClient();
 
-  if (!admin) {
-    console.error("persistContactOnProfile: SUPABASE_SERVICE_ROLE_KEY is not set");
-    return {
-      ok: false,
-      error: "Phone could not be saved — server configuration is incomplete. Contact support.",
-    };
+  if (admin) {
+    const adminResult = await persistContactViaAdmin(admin, userId, contact);
+    if (adminResult.ok) return adminResult;
+    console.error("persistContactOnProfile admin:", adminResult.error);
   }
 
+  return persistContactViaSession(userId, contact);
+}
+
+async function persistContactViaAdmin(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  contact: { phone: string; fullName: string; email: string }
+): Promise<{ ok: boolean; error?: string }> {
   const profileReady = await waitForProfileRow(admin, userId);
   if (!profileReady) {
-    console.error("persistContactOnProfile: profile row not found for", userId);
-    return { ok: false, error: "Account created but profile was not ready. Try signing in again." };
+    return { ok: false, error: "Profile was not ready yet" };
   }
 
   const { data: updated, error } = await admin
@@ -175,7 +193,75 @@ async function persistContactOnProfile(
     .maybeSingle();
 
   if (error) {
-    console.error("persistContactOnProfile profiles:", error.message);
+    if (error.message.includes("phone") && error.message.includes("column")) {
+      return {
+        ok: false,
+        error: "Phone column missing in database. Run supabase/signup-email-phone.sql in Supabase.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  if (!updated?.phone) {
+    return { ok: false, error: "Profile update did not save phone" };
+  }
+
+  const { data: authUser } = await admin.auth.admin.getUserById(userId);
+  const existingMeta = authUser?.user?.user_metadata ?? {};
+  await admin.auth.admin.updateUserById(userId, {
+    phone: contact.phone,
+    user_metadata: {
+      ...existingMeta,
+      phone: contact.phone,
+      full_name: contact.fullName,
+      auth_method: "email",
+    },
+  });
+
+  return { ok: true };
+}
+
+async function persistContactViaSession(
+  userId: string,
+  contact: { phone: string; fullName: string; email: string }
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.id !== userId) {
+    return {
+      ok: false,
+      error: "Phone could not be saved — server configuration is incomplete. Contact support.",
+    };
+  }
+
+  await supabase.auth.updateUser({
+    data: {
+      phone: contact.phone,
+      full_name: contact.fullName,
+      auth_method: "email",
+    },
+  });
+
+  const profileReady = await waitForProfileRowSession(supabase, userId);
+  if (!profileReady) {
+    return { ok: false, error: "Account created but profile was not ready. Try adding phone from dashboard." };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("profiles")
+    .update({
+      phone: contact.phone,
+      full_name: contact.fullName,
+      email: contact.email,
+    })
+    .eq("id", userId)
+    .select("id, phone")
+    .maybeSingle();
+
+  if (error) {
     if (error.message.includes("phone") && error.message.includes("column")) {
       return {
         ok: false,
@@ -186,29 +272,7 @@ async function persistContactOnProfile(
   }
 
   if (!updated?.phone) {
-    console.error("persistContactOnProfile: update returned no phone for", userId);
-    return { ok: false, error: "Phone number was not saved. Please try again or contact support." };
-  }
-
-  const { data: authUser, error: authReadError } = await admin.auth.admin.getUserById(userId);
-  if (authReadError) {
-    console.error("persistContactOnProfile getUser:", authReadError.message);
-  }
-
-  const existingMeta = authUser?.user?.user_metadata ?? {};
-  const { error: authUpdateError } = await admin.auth.admin.updateUserById(userId, {
-    phone: contact.phone,
-    user_metadata: {
-      ...existingMeta,
-      phone: contact.phone,
-      full_name: contact.fullName,
-      auth_method: "email",
-    },
-  });
-
-  if (authUpdateError) {
-    // Profile already has phone — auth.users.phone is optional (dashboard display)
-    console.error("persistContactOnProfile auth.users.phone:", authUpdateError.message);
+    return { ok: false, error: "Phone number was not saved to profile" };
   }
 
   return { ok: true };
@@ -370,11 +434,6 @@ export async function finalizeRegistrationAfterSignUp(input: {
 }): Promise<{ ok: boolean; error?: string }> {
   const e164 = parseInternationalPhone(input.phone);
   if (!e164) return { ok: false, error: "Invalid phone number" };
-
-  const phoneCheck = await isPhoneAvailable(e164);
-  if (!phoneCheck.available) {
-    return { ok: false, error: phoneCheck.error ?? "This phone number is already registered" };
-  }
 
   return persistContactOnProfile(input.userId, {
     phone: e164,

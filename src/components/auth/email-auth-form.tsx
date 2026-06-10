@@ -174,17 +174,36 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
       return;
     }
 
-    const saved = await finalizeRegistrationAfterSignUp({
+    let saved = await finalizeRegistrationAfterSignUp({
       userId: data.user.id,
       fullName: fullName.trim(),
       email: normalizedEmail,
       phone,
     });
 
+    // Browser session fallback if server-side save failed
+    if (!saved.ok && data.session) {
+      const { data: updated, error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          phone,
+          full_name: fullName.trim(),
+          email: normalizedEmail,
+        })
+        .eq("id", data.user.id)
+        .select("phone")
+        .maybeSingle();
+
+      if (!profileError && updated?.phone) {
+        saved = { ok: true };
+      }
+    }
+
     if (!saved.ok) {
       setLoading(false);
       toast.error(saved.error ?? "Account created but phone was not saved");
-      return;
+      if (!data.session) return;
+      toast.message("You can add your phone from the dashboard.");
     }
 
     // Email confirmation enabled — no session until user clicks email link
