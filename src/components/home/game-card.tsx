@@ -7,12 +7,13 @@ import { cn } from "@/lib/utils";
 interface GameCardProps {
   game: Game;
   className?: string;
+  eager?: boolean;
 }
 
-export function GameCard({ game, className }: GameCardProps) {
+export function GameCard({ game, className, eager }: GameCardProps) {
   return (
     <div className={cn("w-full", className)}>
-      <CompactGameCard game={game} variant="grid" />
+      <CompactGameCard game={game} variant="grid" eager={eager} />
     </div>
   );
 }

@@ -121,7 +121,7 @@ body {
 }
 
 .wallet-card-body {
-  min-height: 72px;
+  min-height: 80px;
 }
 
 .gradient-bg {
@@ -435,6 +435,69 @@ body {
   pointer-events: none;
 }
 
+.hero-fade-in {
+  animation: hero-fade-in 0.6s ease-out both;
+}
+
+.hero-scale-in {
+  animation: hero-scale-in 0.7s ease-out 0.15s both;
+}
+
+.hero-word-swap {
+  animation: hero-word-swap 0.35s ease-out both;
+}
+
+.mobile-drawer-backdrop {
+  animation: fade-in 0.2s ease-out both;
+}
+
+.mobile-drawer-panel {
+  animation: slide-in-left 0.25s ease-out both;
+}
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hero-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hero-word-swap {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 @keyframes slot-glow-pulse {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.05); }
@@ -465,6 +528,92 @@ body {
   10% { opacity: 1; }
   90% { opacity: 0.8; }
   100% { transform: translateY(280px) rotate(360deg); opacity: 0; }
+}
+
+/* Hero logo — 3D coin flip on hover */
+.coin-flip-scene {
+  position: relative;
+  perspective: 1200px;
+}
+
+.coin-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.85s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.coin-flip-scene:hover .coin-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.coin-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 50%;
+}
+
+.coin-flip-front {
+  transform: rotateY(0deg);
+}
+
+.coin-flip-back {
+  transform: rotateY(180deg);
+}
+
+.coin-flip-rim {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  padding: 5px;
+  background: linear-gradient(145deg, #fde68a 0%, #f59e0b 35%, #b45309 70%, #fde68a 100%);
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.35),
+    0 8px 32px rgba(251, 191, 36, 0.35),
+    inset 0 2px 4px rgba(255, 255, 255, 0.35);
+}
+
+.coin-flip-back-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #fcd34d 0%, #d97706 45%, #92400e 100%);
+}
+
+.coin-flip-back-text {
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #1a0a00;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.coin-flip-back-sub {
+  margin-top: 0.25rem;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: rgba(26, 10, 0, 0.75);
+}
+
+.coin-flip-glow {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.35) 0%, transparent 70%);
+  opacity: 0.6;
+  z-index: -1;
+  transition: opacity 0.4s, transform 0.4s;
+  pointer-events: none;
+}
+
+.coin-flip-scene:hover .coin-flip-glow {
+  opacity: 1;
+  transform: scale(1.08);
 }
 
 /* Prize wheel — Casinoze-style */
@@ -664,4 +813,33 @@ body {
 @keyframes prize-wheel-glow-pulse {
   0%, 100% { opacity: 0.7; transform: scale(0.95); }
   50% { opacity: 1; transform: scale(1); }
+}
+
+/* Mobile performance — reduce GPU-heavy effects */
+@media (max-width: 767px) {
+  .slot-glow {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  .marquee-track {
+    animation-duration: 36s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .falling-coin,
+  .slot-glow,
+  .game-slider-scroll {
+    animation: none !important;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
 }

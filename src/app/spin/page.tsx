@@ -24,13 +24,13 @@ export default async function SpinPage() {
   let history: Awaited<ReturnType<typeof getSpinHistory>> = [];
 
   if (user) {
-    const status = await getSpinStatus();
+    const [status, historyResult] = await Promise.all([getSpinStatus(), getSpinHistory()]);
     if (!("error" in status)) {
       dailyLimit = status.dailyLimit;
       remaining = status.remaining;
       nextFreeSpinMs = status.nextFreeSpinMs;
     }
-    history = await getSpinHistory();
+    history = historyResult;
   } else {
     dailyLimit = DAILY_SPINS_BY_TIER.bronze;
     remaining = 0;

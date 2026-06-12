@@ -75,16 +75,20 @@ export async function sendAdminMessage(
     return { error: "Message cannot be empty" };
   }
 
-  const { error } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    content: content.trim(),
-    ...(attachment && {
-      attachment_url: attachment.url,
-      attachment_type: attachment.type,
-      attachment_name: attachment.name,
-    }),
-  });
+  const { error, data: inserted } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: content.trim(),
+      ...(attachment && {
+        attachment_url: attachment.url,
+        attachment_type: attachment.type,
+        attachment_name: attachment.name,
+      }),
+    })
+    .select("*")
+    .single();
 
   if (error) {
     const hint = error.message.includes("attachment_")
@@ -117,7 +121,7 @@ export async function sendAdminMessage(
     .eq("id", conversationId);
 
   revalidatePath("/admin/chat");
-  return { success: true };
+  return { success: true, message: inserted };
 }
 
 export interface AdminUserSearchResult {

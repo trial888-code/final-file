@@ -15,11 +15,11 @@ function RegisterForm() {
       <CardHeader>
         <CardTitle>Create Account</CardTitle>
         <CardDescription>
-          Create your account — sign up and start instantly
+          Create your account — we&apos;ll email you a confirmation link to verify before sign-in
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <EmailAuthForm mode="register" redirect="/dashboard" referralCodeFromUrl={refFromUrl} />
+        <EmailAuthForm mode="register" redirect="/" referralCodeFromUrl={refFromUrl} />
 
         <p className="text-sm text-muted-foreground text-center">
           Already have an account?{" "}

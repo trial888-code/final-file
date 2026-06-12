@@ -21,7 +21,7 @@ export function OrganizationSchema() {
         "@type": "Organization",
         name: SITE_NAME,
         url: SITE_URL,
-        logo: `${SITE_URL}/logo.jpeg`,
+        logo: `${SITE_URL}/logo.webp`,
         description: SITE_DESCRIPTION,
         sameAs: [],
         contactPoint: {

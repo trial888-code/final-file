@@ -1,5 +1,5 @@
 -- Email signup: save phone on profile + auth user + welcome message
--- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/aptzyjsaptaqcovjatqi/sql/new
+-- Run in Supabase SQL Editor: https://supabase.com/dashboard/project/drpitkvjcwrbzzufwwjt/sql/new
 --
 -- WHERE TO CHECK PHONE AFTER SIGNUP:
 --   Table Editor → public.profiles → "phone" column (NOT Authentication → Users phone filter only)

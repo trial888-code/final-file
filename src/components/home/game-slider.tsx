@@ -3,22 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GAMES } from "@/lib/games";
 import { CompactGameCard } from "@/components/home/compact-game-card";
+import { useIsMobile, usePrefersReducedMotion } from "@/lib/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 export function GameSlider() {
-  const items = [...GAMES, ...GAMES];
+  const isMobile = useIsMobile();
+  const reducedMotion = usePrefersReducedMotion();
+  const autoScroll = !isMobile && !reducedMotion;
+  const availableGames = GAMES.filter((g) => !g.upcoming);
+
+  const items = autoScroll ? [...availableGames, ...availableGames] : availableGames;
   const scrollRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const isTouching = useRef(false);
   const dragStartX = useRef(0);
   const dragScrollLeft = useRef(0);
   const dragMoved = useRef(0);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(!autoScroll);
   const [isGrabbing, setIsGrabbing] = useState(false);
 
   const loopScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !autoScroll) return;
     const half = el.scrollWidth / 2;
     if (half <= 0) return;
     if (el.scrollLeft >= half) {
@@ -26,48 +31,48 @@ export function GameSlider() {
     } else if (el.scrollLeft <= 0) {
       el.scrollLeft += half;
     }
-  }, []);
+  }, [autoScroll]);
 
   useEffect(() => {
+    if (!autoScroll) return;
     const el = scrollRef.current;
     if (!el) return;
     if (el.scrollLeft === 0 && el.scrollWidth > 0) {
       el.scrollLeft = 1;
     }
-  }, []);
+  }, [autoScroll]);
 
   useEffect(() => {
+    if (!autoScroll) return;
     const el = scrollRef.current;
     if (!el || paused) return;
 
     let raf = 0;
+    let running = true;
+
     const tick = () => {
-      if (!paused && !isDragging.current && !isTouching.current) {
+      if (!running) return;
+      if (!paused && !isDragging.current && document.visibilityState === "visible") {
         el.scrollLeft += 0.6;
         loopScroll();
       }
       raf = requestAnimationFrame(tick);
     };
+
     raf = requestAnimationFrame(tick);
 
-    return () => cancelAnimationFrame(raf);
-  }, [paused, loopScroll]);
-
-  function onTouchStart() {
-    isTouching.current = true;
-    setPaused(true);
-  }
-
-  function onTouchEnd() {
-    isTouching.current = false;
-    loopScroll();
-    window.setTimeout(() => setPaused(false), 1500);
-  }
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [paused, loopScroll, autoScroll]);
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!autoScroll) return;
     if (e.pointerType === "touch") return;
-
     if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("a")) return;
+
     const el = scrollRef.current;
     if (!el) return;
 
@@ -77,11 +82,16 @@ export function GameSlider() {
     dragScrollLeft.current = el.scrollLeft;
     setPaused(true);
     setIsGrabbing(true);
-    el.setPointerCapture(e.pointerId);
+
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore — mobile browsers may reject */
+    }
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch" || !isDragging.current || !scrollRef.current) return;
+    if (!autoScroll || e.pointerType === "touch" || !isDragging.current || !scrollRef.current) return;
     const dx = e.clientX - dragStartX.current;
     dragMoved.current = Math.max(dragMoved.current, Math.abs(dx));
     scrollRef.current.scrollLeft = dragScrollLeft.current - dx;
@@ -89,12 +99,17 @@ export function GameSlider() {
   }
 
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch") return;
-    if (!isDragging.current || !scrollRef.current) return;
+    if (!autoScroll || e.pointerType === "touch" || !isDragging.current || !scrollRef.current) return;
 
     isDragging.current = false;
     setIsGrabbing(false);
-    scrollRef.current.releasePointerCapture(e.pointerId);
+
+    try {
+      scrollRef.current.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+
     loopScroll();
     window.setTimeout(() => setPaused(false), 1500);
   }
@@ -104,6 +119,7 @@ export function GameSlider() {
       e.preventDefault();
       e.stopPropagation();
     }
+    dragMoved.current = 0;
   }
 
   return (
@@ -111,24 +127,33 @@ export function GameSlider() {
       <div
         ref={scrollRef}
         className={cn(
-          "game-slider-scroll flex gap-3 sm:gap-4 overflow-x-auto select-none",
-          isGrabbing ? "cursor-grabbing" : "cursor-grab"
+          "game-slider-scroll flex gap-3 sm:gap-4 overflow-x-auto overscroll-x-contain",
+          autoScroll ? "select-none" : "snap-x snap-mandatory scroll-smooth",
+          autoScroll && (isGrabbing ? "cursor-grabbing" : "cursor-grab")
         )}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
+        style={{ WebkitOverflowScrolling: "touch" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => {
-          if (!isDragging.current) setPaused(false);
-        }}
-        onClickCapture={blockClickIfDragged}
+        onMouseEnter={autoScroll ? () => setPaused(true) : undefined}
+        onMouseLeave={
+          autoScroll
+            ? () => {
+                if (!isDragging.current) setPaused(false);
+              }
+            : undefined
+        }
+        onClickCapture={autoScroll ? blockClickIfDragged : undefined}
       >
         {items.map((game, i) => (
-          <CompactGameCard key={`${game.id}-${i}`} game={game} variant="slider" />
+          <CompactGameCard
+            key={`${game.id}-${i}`}
+            game={game}
+            variant="slider"
+            eager={i < 5}
+            className={!autoScroll ? "snap-start" : undefined}
+          />
         ))}
       </div>
     </section>

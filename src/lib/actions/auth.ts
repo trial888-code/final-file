@@ -133,12 +133,12 @@ export async function isEmailAvailable(
 async function waitForProfileRow(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
-  attempts = 20
+  attempts = 8
 ): Promise<boolean> {
   for (let i = 0; i < attempts; i++) {
     const { data } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
     if (data) return true;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
   return false;
 }
@@ -146,12 +146,12 @@ async function waitForProfileRow(
 async function waitForProfileRowSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  attempts = 20
+  attempts = 8
 ): Promise<boolean> {
   for (let i = 0; i < attempts; i++) {
     const { data } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
     if (data) return true;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
   return false;
 }
@@ -315,7 +315,7 @@ export async function signInWithEmailPassword(input: {
     if (isEmailNotConfirmedError(error.message, code)) {
       const emailRedirectTo = buildAuthCallbackUrl(
         input.callbackOrigin,
-        input.redirect ?? "/dashboard"
+        input.redirect ?? "/"
       );
       const { error: resendError } = await supabase.auth.resend({
         type: "signup",
@@ -324,7 +324,7 @@ export async function signInWithEmailPassword(input: {
       });
 
       if (resendError) {
-        return { ok: false, error: formatAuthErrorMessage(resendError.message) };
+        return { ok: false, error: formatAuthErrorMessage(resendError) };
       }
 
       // Do not signOut — it clears the PKCE verifier needed for the confirmation link
@@ -336,7 +336,7 @@ export async function signInWithEmailPassword(input: {
       };
     }
 
-    return { ok: false, error: formatAuthErrorMessage(error.message) };
+    return { ok: false, error: formatAuthErrorMessage(error) };
   }
 
   return { ok: true, loggedIn: true };
@@ -368,7 +368,7 @@ export async function registerWithEmail(input: {
 
   const emailRedirectTo = buildAuthCallbackUrl(
     input.callbackOrigin,
-    input.redirect ?? "/dashboard",
+    input.redirect ?? "/",
     input.referralCode
   );
 
@@ -388,7 +388,7 @@ export async function registerWithEmail(input: {
   });
 
   if (error) {
-    return { ok: false, error: formatAuthErrorMessage(error.message) };
+    return { ok: false, error: formatAuthErrorMessage(error) };
   }
   if (!data.user) return { ok: false, error: "Could not create account" };
 

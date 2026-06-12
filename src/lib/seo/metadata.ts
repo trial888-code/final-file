@@ -14,7 +14,7 @@ export function createMetadata({
   description,
   keywords,
   path,
-  ogImage = "/logo.jpeg",
+  ogImage = "/logo.webp",
 }: PageSEO): Metadata {
   const fullTitle = title === SITE_NAME ? `${SITE_NAME} | Premium Gaming Support Platform` : `${title} | ${SITE_NAME}`;
   const url = `${SITE_URL}${path}`;

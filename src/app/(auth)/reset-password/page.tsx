@@ -26,7 +26,7 @@ export default function ResetPasswordPage() {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: getAuthCallbackUrl("/login"),
+      redirectTo: getAuthCallbackUrl("/reset-password/update"),
     });
 
     if (error) {
@@ -45,7 +45,9 @@ export default function ResetPasswordPage() {
       <CardHeader>
         <CardTitle>Reset Password</CardTitle>
         <CardDescription>
-          {sent ? "Check your email for a reset link" : "Enter the email on your account"}
+          {sent
+            ? "Check your email for a reset link"
+            : "Enter your email and we will send you a link to reset your password"}
         </CardDescription>
       </CardHeader>
       <CardContent>

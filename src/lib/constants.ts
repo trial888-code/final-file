@@ -2,7 +2,7 @@ export const SITE_NAME = "Spinora";
 
 /** VIP points awarded per successful referral */
 export const REFERRAL_REWARD_POINTS = 10;
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinora.com";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
 export const SITE_DESCRIPTION =
   "Premium gaming support and account platform. Request game accounts, VIP rewards, live chat support, and exclusive promotions.";
 
@@ -55,10 +55,19 @@ export const PUBLIC_ROUTES = [
   { path: "/register", priority: 0.5 },
 ] as const;
 
-/** Update these with your real social profile URLs */
+/** Official Spinora social profile URLs — used in footer, tasks, and share buttons */
 export const SOCIAL_LINKS = {
-  telegram: process.env.NEXT_PUBLIC_TELEGRAM_URL || "https://t.me/spinora",
-  facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL || "https://facebook.com/spinora",
+  telegram:
+    process.env.NEXT_PUBLIC_TELEGRAM_URL ||
+    "https://t.me/+Y80HSM0UiZw5ODdh",
+  facebook:
+    process.env.NEXT_PUBLIC_FACEBOOK_URL ||
+    "https://www.facebook.com/share/19ea1cSC5W/",
+  instagram:
+    process.env.NEXT_PUBLIC_INSTAGRAM_URL ||
+    "https://www.instagram.com/spinora09?igsh=MXhtM3gxZmRlNnR5Zw==",
+  tiktok:
+    process.env.NEXT_PUBLIC_TIKTOK_URL ||
+    "https://www.tiktok.com/@spinora09",
   whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_URL || "https://wa.me/1234567890",
-  instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL || "https://instagram.com/spinora",
 } as const;

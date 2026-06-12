@@ -1,18 +1,52 @@
-import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
 
-export async function GET(request: Request) {
+function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
+  const { searchParams } = new URL(request.url);
+  const raw =
+    searchParams.get("redirect") ||
+    searchParams.get("next") ||
+    (type === "recovery" ? "/reset-password/update" : "/dashboard");
+  return raw.startsWith("/") ? raw : "/dashboard";
+}
+
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const redirect = searchParams.get("redirect") || "/dashboard";
+  const rawType = searchParams.get("type");
+  const type = (rawType === "email" ? "signup" : rawType) as EmailOtpType | null;
+  const redirect = resolveRedirect(request, type);
   const referralCode = searchParams.get("ref");
-  const safeRedirect = redirect.startsWith("/") ? redirect : "/dashboard";
 
-  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const destUrl = new URL(redirect, origin);
+  if (type === "signup") {
+    destUrl.searchParams.set("verified", "1");
+  }
+
+  let response = NextResponse.redirect(destUrl);
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -30,7 +64,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
   }
 
-  await syncProfileFromAuthMetadata();
+  try {
+    await syncProfileFromAuthMetadata();
+  } catch (err) {
+    console.error("auth callback profile sync:", err);
+  }
 
   if (referralCode?.trim()) {
     const {
@@ -61,5 +99,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${safeRedirect}`);
+  return response;
 }

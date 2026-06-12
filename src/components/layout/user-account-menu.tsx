@@ -12,6 +12,8 @@ import {
   Sparkles,
   User,
   Users,
+  StarHalf,
+  Target,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { logoutUser } from "@/lib/auth/logout";
@@ -26,6 +28,8 @@ const MENU_LINKS = [
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
+  { href: "/dashboard/reviews", label: "Reviews", icon: StarHalf },
+  { href: "/dashboard/tasks", label: "Daily Tasks", icon: Target },
   { href: "/spin", label: "Daily Spin", icon: Sparkles },
 ];
 

@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/actions/notifications";
+import { walletTypeLabel, type WalletType } from "@/lib/wallet/types";
 
 export interface WalletBalance {
   walletBalance: number;
   bonusWallet: number;
+  cashoutWallet: number;
+  bonusRedeemWallet: number;
 }
 
 export async function getMyWallet(): Promise<WalletBalance | { error: string }> {
@@ -37,13 +40,18 @@ export async function getWalletForUser(userId: string): Promise<WalletBalance | 
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("wallet_balance, bonus_wallet")
+    .select("wallet_balance, bonus_wallet, cashout_wallet, bonus_redeem_wallet")
     .eq("id", userId)
     .single();
 
   if (error) {
-    if (error.message.includes("wallet_balance") || error.message.includes("bonus_wallet")) {
-      return { error: "Wallet not set up. Run supabase/wallets.sql in Supabase." };
+    if (
+      error.message.includes("wallet_balance") ||
+      error.message.includes("bonus_wallet") ||
+      error.message.includes("cashout_wallet") ||
+      error.message.includes("bonus_redeem_wallet")
+    ) {
+      return { error: "Wallet not set up. Run supabase/redeem-wallets-and-balance-check.sql in Supabase." };
     }
     return { error: error.message };
   }
@@ -51,13 +59,15 @@ export async function getWalletForUser(userId: string): Promise<WalletBalance | 
   return {
     walletBalance: Number(profile?.wallet_balance ?? 0),
     bonusWallet: Number(profile?.bonus_wallet ?? 0),
+    cashoutWallet: Number(profile?.cashout_wallet ?? 0),
+    bonusRedeemWallet: Number(profile?.bonus_redeem_wallet ?? 0),
   };
 }
 
 export async function creditUserWallet(
   userId: string,
   amount: number,
-  walletType: "current" | "bonus",
+  walletType: WalletType,
   source: string,
   description?: string
 ): Promise<{ success?: boolean; error?: string }> {
@@ -118,7 +128,7 @@ export async function getWalletTransactions(userId?: string, limit = 10) {
 export async function adminGrantWallet(
   userId: string,
   amount: number,
-  walletType: "current" | "bonus",
+  walletType: WalletType,
   note?: string
 ) {
   const supabase = await createClient();
@@ -143,11 +153,10 @@ export async function adminGrantWallet(
   );
 
   if (result.success) {
-    const label = walletType === "bonus" ? "Bonus Wallet" : "Total Deposit";
     await createNotification(
       userId,
       "Wallet Updated",
-      `$${amount} was added to your ${label} by an admin.`,
+      `$${amount} was added to your ${walletTypeLabel(walletType)} by an admin.`,
       "success"
     );
   }
@@ -182,7 +191,7 @@ function revalidateWalletPaths() {
 export async function adminDeductWallet(
   userId: string,
   amount: number,
-  walletType: "current" | "bonus",
+  walletType: WalletType,
   note?: string
 ) {
   if (amount <= 0) return { error: "Invalid amount" };
@@ -211,7 +220,7 @@ export async function adminDeductWallet(
 
 export async function adminResetWallet(
   userId: string,
-  walletType: "current" | "bonus",
+  walletType: WalletType,
   note?: string
 ) {
   const auth = await requireAdmin();

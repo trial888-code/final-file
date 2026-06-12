@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { GAMES } from "@/lib/games";
+import { useIsMobile } from "@/lib/hooks/use-mobile";
 
 interface Activity {
   emoji: string;
@@ -70,6 +71,7 @@ function generateActivityPool(size: number): Activity[] {
 const POOL_SIZE = 36;
 
 export function ActivityToast() {
+  const isMobile = useIsMobile();
   const [activities, setActivities] = useState<Activity[]>(() => generateActivityPool(POOL_SIZE));
   const [index, setIndex] = useState(() => Math.floor(Math.random() * POOL_SIZE));
   const [animating, setAnimating] = useState<"in" | "out">("in");
@@ -99,12 +101,14 @@ export function ActivityToast() {
 
   const activity = activities[index] ?? activities[0];
 
+  if (isMobile) return null;
+
   return (
     <div
       className={`activity-toast fixed top-[6.25rem] right-4 sm:right-6 z-[35] flex items-center gap-3 px-4 py-2.5 rounded-xl border border-purple-500/30 shadow-xl max-w-[min(100vw-2rem,20rem)] ${
         animating === "in" ? "toast-animate-in" : "toast-animate-out"
       }`}
-      style={{ background: "rgba(13,3,24,0.92)", backdropFilter: "blur(12px)" }}
+      style={{ background: "rgba(13,3,24,0.92)" }}
     >
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-purple-600/30 flex items-center justify-center text-lg">
         {activity.emoji}

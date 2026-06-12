@@ -9,9 +9,12 @@ import { EmailAuthForm } from "@/components/auth/email-auth-form";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/dashboard";
+  const redirect = searchParams.get("redirect") || "/";
 
   useEffect(() => {
+    if (searchParams.get("verified") === "1") {
+      toast.success("Email verified! You are signed in.");
+    }
     if (searchParams.get("error") === "auth_callback_failed") {
       toast.error(
         "Confirmation link expired or already used. Register again or sign in to get a new link."
@@ -35,6 +38,11 @@ function LoginForm() {
           Don&apos;t have an account?{" "}
           <Link href="/register" className="text-primary hover:underline">
             Register
+          </Link>
+        </p>
+        <p className="text-sm text-center">
+          <Link href="/reset-password" className="text-primary hover:underline font-medium">
+            Forgot your password?
           </Link>
         </p>
       </CardContent>

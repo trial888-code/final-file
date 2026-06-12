@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  poweredByHeader: false,
+  compress: true,
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -14,7 +20,14 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ["lucide-react", "framer-motion"],
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "sonner",
+      "@supabase/supabase-js",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-select",
+    ],
   },
 };
 

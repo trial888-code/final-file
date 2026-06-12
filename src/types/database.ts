@@ -14,10 +14,13 @@ export interface Profile {
   vip_points: number;
   wallet_balance: number;
   bonus_wallet: number;
+  cashout_wallet: number;
+  bonus_redeem_wallet: number;
   referral_code: string;
   referred_by: string | null;
   is_suspended: boolean;
   is_online: boolean;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,4 +86,21 @@ export interface Referral {
   referred_id: string;
   reward_points: number;
   created_at: string;
+}
+
+export interface Review {
+  id: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  admin_liked: boolean;
+  admin_liked_at: string | null;
+  admin_comment: string | null;
+  admin_commented_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewWithAuthor extends Review {
+  author: Pick<Profile, "full_name" | "email" | "avatar_url" | "vip_tier"> | null;
 }

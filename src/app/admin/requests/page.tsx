@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RequestActions } from "@/components/admin/request-actions";
+import { GameRequestsLiveRefresh } from "@/components/requests/game-requests-live-refresh";
 import { formatDate } from "@/lib/utils";
 import type { RequestStatus } from "@/types/database";
 
@@ -33,6 +34,7 @@ export default async function AdminRequestsPage({
 
   return (
     <div>
+      <GameRequestsLiveRefresh />
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Game Requests</h1>
         <p className="text-muted-foreground text-sm sm:text-base">

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
 import type { Message } from "@/types/database";
 
 function messagePreview(msg: Pick<Message, "content" | "attachment_type">): string {
@@ -36,46 +37,64 @@ export async function getUserConversations(): Promise<ConversationPreview[]> {
 
   if (!conversations?.length) return [];
 
-  const previews: ConversationPreview[] = [];
+  const convIds = conversations.map((c) => c.id);
+  const adminIds = [...new Set(conversations.map((c) => c.admin_id).filter(Boolean))] as string[];
 
-  for (const conv of conversations) {
-    const { data: lastMsgs } = await supabase
+  const [lastMessages, { data: unreadRows }, adminProfilesResult] = await Promise.all([
+    Promise.all(
+      convIds.map((convId) =>
+        supabase
+          .from("messages")
+          .select("conversation_id, content, attachment_type, created_at")
+          .eq("conversation_id", convId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data }) => data)
+      )
+    ),
+    supabase
       .from("messages")
-      .select("content, attachment_type, created_at")
-      .eq("conversation_id", conv.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    const { count: unreadCount } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("conversation_id", conv.id)
+      .select("conversation_id")
+      .in("conversation_id", convIds)
       .eq("is_read", false)
-      .neq("sender_id", user.id);
+      .neq("sender_id", user.id),
+    adminIds.length > 0
+      ? supabase.from("profiles").select("id, full_name").in("id", adminIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+  ]);
 
-    const last = lastMsgs?.[0];
-    let adminName = "Support team";
+  const lastByConv = new Map<
+    string,
+    Pick<Message, "content" | "attachment_type" | "created_at"> & { conversation_id: string }
+  >();
+  for (const msg of lastMessages ?? []) {
+    if (msg) lastByConv.set(msg.conversation_id, msg);
+  }
 
-    if (conv.admin_id) {
-      const { data: adminProfile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", conv.admin_id)
-        .single();
-      if (adminProfile?.full_name) adminName = adminProfile.full_name;
-    }
+  const unreadByConv = new Map<string, number>();
+  for (const row of unreadRows ?? []) {
+    unreadByConv.set(row.conversation_id, (unreadByConv.get(row.conversation_id) ?? 0) + 1);
+  }
 
-    previews.push({
+  const adminNames = new Map<string, string>();
+  for (const p of adminProfilesResult.data ?? []) {
+    if (p.full_name) adminNames.set(p.id, p.full_name);
+  }
+
+  return conversations.map((conv) => {
+    const last = lastByConv.get(conv.id);
+    const adminName = (conv.admin_id && adminNames.get(conv.admin_id)) || "Support team";
+
+    return {
       id: conv.id,
       title: "Spinora Support",
       subtitle: adminName,
       lastMessage: last ? messagePreview(last) : "Start a conversation with our team",
       lastMessageAt: last?.created_at ?? conv.updated_at,
-      unreadCount: unreadCount ?? 0,
-    });
-  }
-
-  return previews;
+      unreadCount: unreadByConv.get(conv.id) ?? 0,
+    };
+  });
 }
 
 export async function getUnreadMessageCount(): Promise<number> {
@@ -130,7 +149,6 @@ export async function markConversationRead(conversationId: string) {
     .neq("sender_id", user.id)
     .eq("is_read", false);
 
-  revalidatePath("/dashboard/messages");
   return { success: true };
 }
 
@@ -163,16 +181,20 @@ export async function sendUserMessage(
     return { error: "Unauthorized" };
   }
 
-  const { error } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    content: content.trim(),
-    ...(attachment && {
-      attachment_url: attachment.url,
-      attachment_type: attachment.type,
-      attachment_name: attachment.name,
-    }),
-  });
+  const { error, data: inserted } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: content.trim(),
+      ...(attachment && {
+        attachment_url: attachment.url,
+        attachment_type: attachment.type,
+        attachment_name: attachment.name,
+      }),
+    })
+    .select("*")
+    .single();
 
   if (error) {
     const hint = error.message.includes("attachment_")
@@ -181,6 +203,13 @@ export async function sendUserMessage(
     return { error: `${error.message}${hint}` };
   }
 
+  void notifyAdminOfCustomerMessage({
+    conversationId,
+    senderId: user.id,
+    content: content.trim(),
+    attachmentType: attachment?.type ?? null,
+  });
+
   await supabase
     .from("conversations")
     .update({ updated_at: new Date().toISOString() })
@@ -188,7 +217,7 @@ export async function sendUserMessage(
 
   revalidatePath("/dashboard/messages");
   revalidatePath("/admin/chat");
-  return { success: true };
+  return { success: true, message: inserted };
 }
 
 export async function ensureUserConversation() {
@@ -217,6 +246,76 @@ export async function ensureUserConversation() {
   }
 
   return { conversationId: conversation.id, updatedAt: conversation.updated_at };
+}
+
+/** Single round-trip inbox load — conversation list + messages + mark read. */
+export async function initUserMessagesInbox(): Promise<{
+  error?: string;
+  userId?: string;
+  conversations?: ConversationPreview[];
+  messages?: Message[];
+  selectedConversationId?: string;
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  let { data: conversation } = await supabase
+    .from("conversations")
+    .select("id, updated_at")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!conversation) {
+    const { data: created, error } = await supabase
+      .from("conversations")
+      .insert({ user_id: user.id })
+      .select("id, updated_at")
+      .single();
+
+    if (error) return { error: error.message };
+    conversation = created;
+  }
+
+  const conversations = await getUserConversations();
+  const selectedConversationId = conversations[0]?.id ?? conversation.id;
+
+  const list =
+    conversations.length > 0
+      ? conversations
+      : [
+          {
+            id: conversation.id,
+            title: "Spinora Support",
+            subtitle: "Support team",
+            lastMessage: "Start a conversation with our team",
+            lastMessageAt: conversation.updated_at,
+            unreadCount: 0,
+          } satisfies ConversationPreview,
+        ];
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", selectedConversationId)
+    .order("created_at", { ascending: true });
+
+  await supabase
+    .from("messages")
+    .update({ is_read: true })
+    .eq("conversation_id", selectedConversationId)
+    .neq("sender_id", user.id)
+    .eq("is_read", false);
+
+  return {
+    userId: user.id,
+    conversations: list,
+    messages: messages ?? [],
+    selectedConversationId,
+  };
 }
 
 export interface AdminConversationUnread {

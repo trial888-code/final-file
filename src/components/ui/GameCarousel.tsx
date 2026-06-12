@@ -4,12 +4,12 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 const GAMES = [
-  { name: "Fire Kirin", img: "/games/fire-kirin.jpeg", badge: "HOT" as const },
-  { name: "Orion Stars", img: "/games/orion-stars.jpeg", badge: "HOT" as const },
-  { name: "Juwa", img: "/games/juwa.jpeg", badge: "POPULAR" as const },
-  { name: "Panda Master", img: "/games/panda-master.jpeg", badge: "HOT" as const },
-  { name: "MR All In One", img: "/games/mr-all-in-one.jpeg", badge: "NEW" as const },
-  { name: "Vegas Sweeps", img: "/games/vegas-sweeps.jpeg", badge: "POPULAR" as const },
+  { name: "Fire Kirin", img: "/games/fire-kirin.webp", badge: "HOT" as const },
+  { name: "Orion Stars", img: "/games/orion-stars.webp", badge: "HOT" as const },
+  { name: "Juwa", img: "/games/juwa.webp", badge: "POPULAR" as const },
+  { name: "Panda Master", img: "/games/panda-master.webp", badge: "HOT" as const },
+  { name: "MR All In One", img: "/games/mr-all-in-one.webp", badge: "NEW" as const },
+  { name: "Vegas Sweeps", img: "/games/vegas-sweeps.webp", badge: "POPULAR" as const },
 ];
 
 const BADGE_STYLES = {

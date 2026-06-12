@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, type RefObject } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,20 @@ import { UnreadBadge } from "@/components/ui/unread-badge";
 import {
   ensureUserConversation,
   getUserConversations,
-  markConversationRead,
-  sendUserMessage,
+  initUserMessagesInbox,
   type ConversationPreview,
 } from "@/lib/actions/messages";
-import { useUnreadMessages } from "@/components/chat/message-realtime-provider";
+import {
+  markConversationReadClient,
+  sendMessageClient,
+} from "@/lib/chat/send-message-client";
+import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { CHAT_INBOX_CARD_CLASS, CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
+import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
+import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events";
+import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
+import { subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { toast } from "sonner";
 import { ArrowLeft, Headphones, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
@@ -35,6 +44,7 @@ interface UserChatPanelProps {
   onSend: (file: File | null) => Promise<boolean>;
   loading: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
+  onScrollMessages?: () => void;
 }
 
 function UserChatPanel({
@@ -49,6 +59,7 @@ function UserChatPanel({
   onSend,
   loading,
   scrollRef,
+  onScrollMessages,
 }: UserChatPanelProps) {
   if (!selectedConversation) {
     return (
@@ -62,7 +73,7 @@ function UserChatPanel({
   }
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
       <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
         {showMobileBack && (
           <Button
@@ -89,7 +100,8 @@ function UserChatPanel({
 
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]"
+        onScroll={onScrollMessages}
+        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]`}
       >
         {messages.length === 0 ? (
           <div className="text-center py-12">
@@ -133,13 +145,14 @@ function UserChatPanel({
         disabled={!selectedId}
         placeholder="Type a message..."
         showSendLabel
-        className="bg-[#121212] border-white/10"
+        className="bg-[#121212] border-white/10 shrink-0"
       />
-    </>
+    </div>
   );
 }
 
 export function UserMessagesInbox() {
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -151,6 +164,13 @@ export function UserMessagesInbox() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
   const { refresh: refreshUnread } = useUnreadMessages();
+  const mobileChatOpenRef = useRef(mobileChatOpen);
+  const selectedIdRef = useRef<string | null>(null);
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialConversationHandled = useRef(false);
+
+  mobileChatOpenRef.current = mobileChatOpen;
+  selectedIdRef.current = selectedId;
 
   const selectedConversation = conversations.find((c) => c.id === selectedId);
 
@@ -161,8 +181,16 @@ export function UserMessagesInbox() {
     return list;
   }, []);
 
+  const scheduleInboxSync = useCallback(() => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = setTimeout(() => {
+      void refreshUnread();
+      void loadConversations();
+    }, 150);
+  }, [refreshUnread, loadConversations]);
+
   const loadMessages = useCallback(
-    async (convId: string) => {
+    async (convId: string, options?: { syncSidebar?: boolean }) => {
       if (!supabase) return;
 
       const { data } = await supabase
@@ -172,11 +200,13 @@ export function UserMessagesInbox() {
         .order("created_at", { ascending: true });
 
       setMessages(data ?? []);
-      await markConversationRead(convId);
-      await refreshUnread();
-      await loadConversations();
+      if (userId) void markConversationReadClient(supabase, convId, userId);
+      if (options?.syncSidebar !== false) {
+        void refreshUnread();
+        void loadConversations();
+      }
     },
-    [supabase, refreshUnread, loadConversations]
+    [supabase, userId, refreshUnread, loadConversations]
   );
 
   const init = useCallback(async () => {
@@ -186,77 +216,102 @@ export function UserMessagesInbox() {
     }
 
     setInitLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const result = await initUserMessagesInbox();
 
-    if (!user) {
+      if (result.error || !result.userId) {
+        setInitLoading(false);
+        return;
+      }
+
+      setUserId(result.userId);
+      setConversations(result.conversations ?? []);
+      if (result.selectedConversationId) {
+        setSelectedId(result.selectedConversationId);
+      }
+      setMessages(result.messages ?? []);
+      void refreshUnread();
+    } finally {
       setInitLoading(false);
-      return;
     }
-
-    setUserId(user.id);
-    const list = await loadConversations();
-
-    if (list.length > 0) {
-      setSelectedId(list[0].id);
-      await loadMessages(list[0].id);
-    }
-
-    setInitLoading(false);
-  }, [supabase, loadConversations, loadMessages]);
+  }, [supabase, refreshUnread]);
 
   useEffect(() => {
     init();
   }, [init]);
 
-  useEffect(() => {
-    if (!selectedId || !supabase) return;
+  const openConversation = useCallback(
+    async (convId: string) => {
+      if (convId === selectedIdRef.current) {
+        setMobileChatOpen(true);
+        return;
+      }
+      setSelectedId(convId);
+      setMobileChatOpen(true);
+      await loadMessages(convId);
+    },
+    [loadMessages]
+  );
 
-    const channel = supabase
-      .channel(`user-inbox-${selectedId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${selectedId}`,
-        },
-        (payload) => {
-          const msg = payload.new as Message;
+  useEffect(() => {
+    const conversationParam = searchParams.get("conversation");
+    if (!conversationParam || initialConversationHandled.current || initLoading) return;
+    initialConversationHandled.current = true;
+    void openConversation(conversationParam);
+  }, [searchParams, initLoading, openConversation]);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+
+    const convIds = conversations.map((c) => c.id);
+
+    return subscribeToMessageInserts(
+      supabase,
+      `user-inbox-${userId}`,
+      userId,
+      (msg) => {
+        playIncomingMessageSound(msg.sender_id, userId);
+
+        if (msg.conversation_id === selectedIdRef.current) {
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-
-          if (userId && msg.sender_id !== userId) {
-            if (mobileChatOpen || window.matchMedia("(min-width: 768px)").matches) {
-              void markConversationRead(selectedId).then(() => {
-                refreshUnread();
-                loadConversations();
-              });
-            } else {
-              refreshUnread();
-              loadConversations();
-            }
+          setMobileChatOpen(true);
+          const chatVisible =
+            mobileChatOpenRef.current || window.matchMedia("(min-width: 768px)").matches;
+          if (chatVisible) {
+            void markConversationReadClient(supabase, msg.conversation_id, userId).then(() =>
+              scheduleInboxSync()
+            );
           } else {
-            loadConversations();
+            scheduleInboxSync();
           }
+          return;
         }
-      )
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedId, supabase, userId, mobileChatOpen, refreshUnread, loadConversations]);
+        scheduleInboxSync();
+      },
+      convIds.length > 0 ? { conversationIds: convIds } : undefined
+    );
+  }, [conversations, supabase, userId, scheduleInboxSync]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+    function onChatIncoming(event: Event) {
+      const { conversationId } = (event as CustomEvent<ChatIncomingDetail>).detail;
+      if (conversationId) void openConversation(conversationId);
+    }
+
+    window.addEventListener(CHAT_INCOMING_EVENT, onChatIncoming);
+    return () => window.removeEventListener(CHAT_INCOMING_EVENT, onChatIncoming);
+  }, [openConversation]);
+
+  const messageFingerprint = messages.length > 0 ? messages[messages.length - 1]?.id : "";
+  const { onScroll: onScrollMessages } = useChatAutoScroll(
+    scrollRef,
+    messages.length,
+    messageFingerprint
+  );
 
   async function selectConversation(convId: string) {
-    setSelectedId(convId);
-    setMobileChatOpen(true);
-    await loadMessages(convId);
+    await openConversation(convId);
   }
 
   async function handleSend(file: File | null): Promise<boolean> {
@@ -285,7 +340,13 @@ export function UserMessagesInbox() {
       attachment = uploadResult.data;
     }
 
-    const result = await sendUserMessage(selectedId, content, attachment);
+    const result = await sendMessageClient(supabase, {
+      conversationId: selectedId,
+      senderId: userId!,
+      content,
+      attachment,
+      kind: "user",
+    });
     if (result.error) {
       toast.error(result.error);
       setInput(content);
@@ -293,8 +354,14 @@ export function UserMessagesInbox() {
       return false;
     }
 
-    await loadMessages(selectedId);
+    if (result.message) {
+      setMessages((prev) =>
+        prev.some((m) => m.id === result.message!.id) ? prev : [...prev, result.message!]
+      );
+    }
+
     setLoading(false);
+    scheduleInboxSync();
     return true;
   }
 
@@ -308,11 +375,12 @@ export function UserMessagesInbox() {
     onSend: handleSend,
     loading,
     scrollRef,
+    onScrollMessages,
   };
 
   if (initLoading) {
     return (
-      <Card className="min-h-[70vh] flex items-center justify-center">
+      <Card className={`${CHAT_INBOX_CARD_CLASS} items-center justify-center`}>
         <p className="text-sm text-muted-foreground">Loading messages...</p>
       </Card>
     );
@@ -330,20 +398,21 @@ export function UserMessagesInbox() {
 
   return (
     <>
-      <Card className="overflow-hidden border-white/10 bg-[#161616]">
-        <div className="grid grid-cols-1 md:grid-cols-3 min-h-[60vh] md:min-h-[70vh]">
+      <Card className={CHAT_INBOX_CARD_CLASS}>
+        <div className="grid grid-cols-1 md:grid-cols-3 md:grid-rows-1 flex-1 min-h-0 h-full overflow-hidden">
           <div
             className={cn(
-              "border-r border-white/10 flex flex-col bg-[#141414] min-h-[50vh] md:min-h-0",
+              "border-r border-white/10 flex flex-col min-h-0 h-full overflow-hidden bg-[#141414]",
               mobileChatOpen ? "hidden md:flex" : "flex"
             )}
           >
-            <div className="p-4 border-b border-white/10 shrink-0">
-              <h2 className="font-semibold text-white">Chats</h2>
-              <p className="text-xs text-muted-foreground">Your conversations</p>
-            </div>
+            <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
+              <div className="p-4 border-b border-white/10 shrink-0">
+                <h2 className="font-semibold text-white">Chats</h2>
+                <p className="text-xs text-muted-foreground">Your conversations</p>
+              </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              <div className={`${CHAT_SCROLL_CLASS} p-2 space-y-1`}>
               {conversations.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8 px-4">
                   No chats yet. Start one with our support team below.
@@ -383,11 +452,12 @@ export function UserMessagesInbox() {
                   </button>
                 ))
               )}
+              </div>
             </div>
           </div>
 
           {/* Desktop chat panel */}
-          <div className="hidden md:flex md:col-span-2 flex-col min-h-[70vh] min-h-0 overflow-hidden">
+          <div className="hidden md:flex md:col-span-2 flex-col min-h-0 h-full overflow-hidden">
             <UserChatPanel {...chatPanelProps} />
           </div>
         </div>

@@ -1,0 +1,215 @@
+import type { Page } from "playwright";
+import type { GameLoadJob, JuwaBotResult } from "./types.js";
+import { buildJuwaCredentials, usernameVariant } from "./credentials.js";
+import { openBrowserSession, vpnHint } from "./browser.js";
+import {
+  goToUserManagement,
+  fillCreateUserForm,
+  rechargeAccount,
+  redeemAccount,
+  readUserGameBalanceForCheck,
+  userExists,
+} from "./juwa-panel.js";
+import {
+  clickByText,
+  fillFirstTextInput,
+  fillPasswordInput,
+  log,
+  screenshot,
+  submitForm,
+  waitForDashboard,
+  waitForManualLogin,
+  isLoginPage,
+} from "./panel-utils.js";
+
+function env(name: string): string {
+  const v = process.env[name]?.trim();
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
+function envOptional(name: string): string | undefined {
+  return process.env[name]?.trim() || undefined;
+}
+
+function credentialsForJob(job: GameLoadJob): { username: string; password: string } {
+  // User picked their own login → honour it (uniqueness handled separately).
+  const customUser = job.game_username?.trim();
+  if (customUser) {
+    const password = job.game_password?.trim() || customUser;
+    return { username: customUser.slice(0, 13), password };
+  }
+  return buildJuwaCredentials({
+    full_name: job.requester_name,
+    email: job.requester_email,
+  });
+}
+
+/** Find a free account name, appending a letter/number when one is taken. */
+async function resolveUniqueUsername(page: Page, base: string): Promise<string> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const candidate = usernameVariant(base, attempt);
+    const taken = await userExists(page, candidate).catch(() => false);
+    if (!taken) {
+      if (attempt > 0) log("create-user", `"${base}" taken → using "${candidate}"`);
+      return candidate;
+    }
+  }
+  // Fallback: timestamp-based suffix keeps it unique and within 13 chars.
+  const suffix = String(Date.now()).slice(-4);
+  return `${base.slice(0, 13 - suffix.length)}${suffix}`;
+}
+
+async function createUser(
+  page: Page,
+  job: GameLoadJob
+): Promise<{ username: string; password: string }> {
+  const requested = credentialsForJob(job);
+  log("create-user", `${requested.username} (requester: ${job.requester_name ?? job.requester_email ?? job.user_id})`);
+
+  await goToUserManagement(page);
+  await screenshot(page, "03-user-management");
+
+  const username = await resolveUniqueUsername(page, requested.username);
+  const creds = { username, password: requested.password };
+
+  await fillCreateUserForm(page, creds.username, creds.password);
+  await screenshot(page, "04-after-create");
+  return creds;
+}
+
+async function checkBalance(page: Page, job: GameLoadJob): Promise<number> {
+  const username = job.game_username?.trim();
+  if (!username) throw new Error("Check balance requires game username");
+  log("check-balance", username);
+  const balance = await readUserGameBalanceForCheck(page, username);
+  await screenshot(page, "08-balance");
+  return balance;
+}
+
+async function hasCaptcha(page: Page): Promise<boolean> {
+  const captchaInput = page.locator(
+    'input[placeholder*="vc" i], input[placeholder*="captcha" i], input[placeholder*="verify" i], input[placeholder*="code" i]'
+  );
+  if ((await captchaInput.count()) > 0) return true;
+  return page.getByText(/verification code|captcha|vc/i).isVisible().catch(() => false);
+}
+
+async function login(page: Page) {
+  const url = env("JUWA_ADMIN_URL");
+  const username = env("JUWA_AGENT_USERNAME");
+  const password = env("JUWA_AGENT_PASSWORD");
+
+  if (!(await isLoginPage(page)) && page.url().includes("juwa")) {
+    log("login", "already logged in — skipping");
+    return;
+  }
+
+  if (!page.url().includes("juwa") || !(await isLoginPage(page))) {
+    log("login", url);
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  }
+  await screenshot(page, "01-login-page");
+
+  if (!(await isLoginPage(page))) {
+    log("login", "already logged in after navigation");
+    return;
+  }
+
+  if (await hasCaptcha(page)) {
+    await waitForManualLogin(page);
+    await screenshot(page, "02-after-login");
+    log("login", "success (manual)");
+    return;
+  }
+
+  const customUser = envOptional("JUWA_SEL_LOGIN_USER");
+  const customPass = envOptional("JUWA_SEL_LOGIN_PASS");
+
+  if (customUser) {
+    await page.fill(customUser, username);
+  } else {
+    await fillFirstTextInput(page, username, 0);
+  }
+
+  if (customPass) {
+    await page.fill(customPass, password);
+  } else {
+    await fillPasswordInput(page, password, 0);
+  }
+
+  const customSubmit = envOptional("JUWA_SEL_LOGIN_SUBMIT");
+  if (customSubmit) {
+    await page.click(customSubmit);
+  } else {
+    const clicked = await clickByText(page, [/sign in|login|log in|登[录陆]/i], 5000);
+    if (!clicked) await submitForm(page);
+  }
+
+  await waitForDashboard(page, url);
+  await screenshot(page, "02-after-login");
+  log("login", "success");
+}
+
+async function rechargeUser(page: Page, username: string, amount: number) {
+  log("recharge", `${username} $${amount}`);
+  await rechargeAccount(page, username, amount);
+  await screenshot(page, "06-after-recharge");
+}
+
+async function redeemUser(
+  page: Page,
+  job: GameLoadJob
+): Promise<{ username: string; redeemedAmount: number }> {
+  const username = job.game_username?.trim();
+  if (!username) throw new Error("Redeem requires game username");
+
+  const redeemAll = Boolean((job as GameLoadJob & { redeem_all?: boolean }).redeem_all);
+  const amount = redeemAll ? "all" : Number(job.amount);
+  log("redeem", `${username} ${redeemAll ? "all" : `$${amount}`}`);
+
+  const redeemedAmount = await redeemAccount(page, username, amount);
+  await screenshot(page, "07-after-redeem");
+  return { username, redeemedAmount };
+}
+
+export async function runJuwaJob(job: GameLoadJob): Promise<JuwaBotResult> {
+  const session = await openBrowserSession();
+  const { page, close } = session;
+
+  try {
+    await login(page);
+
+    if (job.load_type === "create_account" || job.load_type === "new_account") {
+      const creds = await createUser(page, job);
+      return creds;
+    }
+
+    if (job.load_type === "load" || job.load_type === "reload") {
+      const username = job.game_username?.trim();
+      if (!username) throw new Error("Load requires game username");
+      await rechargeUser(page, username, Number(job.amount));
+      return { username };
+    }
+
+    if (job.load_type === "redeem") {
+      const result = await redeemUser(page, job);
+      return { username: result.username, redeemedAmount: result.redeemedAmount };
+    }
+
+    if (job.load_type === "check_balance") {
+      const balance = await checkBalance(page, job);
+      return { username: job.game_username?.trim() ?? "", balance };
+    }
+
+    throw new Error(`Unknown load type: ${job.load_type}`);
+  } catch (err) {
+    await screenshot(page, "error");
+    throw new Error(vpnHint(err));
+  } finally {
+    // Keep Chrome open when using CDP — don't disconnect mid-session
+    if (!process.env.JUWA_CDP_URL) {
+      await close();
+    }
+  }
+}

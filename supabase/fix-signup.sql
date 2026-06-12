@@ -1,5 +1,5 @@
 -- FIX: "Database error saving new user"
--- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/aptzyjsaptaqcovjatqi/sql/new
+-- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/drpitkvjcwrbzzufwwjt/sql/new
 
 -- 1. Recreate the signup trigger function (with correct Supabase settings)
 CREATE OR REPLACE FUNCTION public.handle_new_user()

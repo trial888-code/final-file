@@ -83,7 +83,7 @@ export function AnimatedLogo({
     >
       {showImage && (
         <Image
-          src="/logo.jpeg"
+          src="/logo.webp"
           alt={SITE_NAME}
           width={imageSize}
           height={imageSize}

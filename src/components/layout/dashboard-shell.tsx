@@ -1,8 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { HomeSidebar } from "@/components/home/home-sidebar";
-import { WalletCardLoader } from "@/components/wallet/wallet-card-loader";
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { AccountSidebar } from "@/components/layout/account-sidebar";
+import { DeferredWalletCardLoader } from "@/components/wallet/deferred-wallet-card-loader";
 import { AppShell } from "@/components/layout/app-shell";
 
 interface DashboardShellProps {
@@ -10,24 +12,21 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children }: DashboardShellProps) {
-  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  function handleSearch() {
-    router.push("/#games");
-  }
+  useEffect(() => {
+    if (searchParams.get("verified") === "1") {
+      toast.success("Welcome to Spinora! Your email is verified.");
+    }
+  }, [searchParams]);
 
   return (
     <AppShell
-      onSearchClick={handleSearch}
-      showTicker
+      showTicker={false}
       showFooter={false}
+      assumeLoggedIn
       sidebar={
-        <HomeSidebar
-          activeTab="all"
-          onTabChange={() => router.push("/")}
-          onSearchClick={handleSearch}
-          walletSlot={<WalletCardLoader />}
-        />
+        <AccountSidebar walletSlot={<DeferredWalletCardLoader />} />
       }
     >
       {children}

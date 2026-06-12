@@ -1,12 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { MarqueeTicker } from "@/components/ui/MarqueeTicker";
+import dynamic from "next/dynamic";
 import { HomeHeader } from "@/components/home/home-header";
 import { Footer } from "@/components/layout/footer";
-import { CookieConsent } from "@/components/ui/cookie-consent";
+import { cn } from "@/lib/utils";
+
+const MarqueeTicker = dynamic(
+  () => import("@/components/ui/MarqueeTicker").then((m) => ({ default: m.MarqueeTicker })),
+  { ssr: false, loading: () => <div className="h-9 bg-[#0d0318] border-y border-purple-900/40" aria-hidden /> }
+);
+
+const DeferredCookieConsent = dynamic(
+  () =>
+    import("@/components/ui/deferred-cookie-consent").then((m) => ({
+      default: m.DeferredCookieConsent,
+    })),
+  { ssr: false }
+);
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -14,6 +26,8 @@ interface AppShellProps {
   onSearchClick?: () => void;
   showFooter?: boolean;
   showTicker?: boolean;
+  /** Skip client auth check on dashboard — layout already verified session */
+  assumeLoggedIn?: boolean;
 }
 
 export function AppShell({
@@ -22,6 +36,7 @@ export function AppShell({
   onSearchClick,
   showFooter = true,
   showTicker = true,
+  assumeLoggedIn = false,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -55,50 +70,45 @@ export function AppShell({
       <HomeHeader
         onSearchClick={onSearchClick ?? (() => {})}
         onMenuClick={() => setMobileOpen(true)}
+        assumeLoggedIn={assumeLoggedIn}
       />
       {showTicker && <MarqueeTicker />}
 
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 z-50 bg-black/70"
-              onClick={closeMobile}
-              aria-hidden
-            />
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-[min(18rem,88vw)] overflow-y-auto bg-[#121212] border-r border-white/10 shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Navigation menu"
-            >
-              <div className="sticky top-0 z-10 flex items-center justify-end p-3 bg-[#121212]/95 backdrop-blur-sm border-b border-white/5">
-                <button
-                  type="button"
-                  onClick={closeMobile}
-                  className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Close menu"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div
-                className="p-3 pt-0 [&_aside]:min-h-0 [&_aside]:rounded-none [&_aside]:border-0 [&_aside]:shadow-none [&_aside]:bg-transparent"
-                onClick={handleSidebarClick}
+      {mobileOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 z-50 bg-black/70 mobile-drawer-backdrop"
+            onClick={closeMobile}
+            aria-hidden
+          />
+          <aside
+            className={cn(
+              "lg:hidden fixed left-0 top-0 bottom-0 z-50 w-[min(18rem,88vw)] overflow-y-auto",
+              "bg-[#121212] border-r border-white/10 shadow-2xl mobile-drawer-panel"
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-end p-3 bg-[#121212]/95 backdrop-blur-sm border-b border-white/5">
+              <button
+                type="button"
+                onClick={closeMobile}
+                className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close menu"
               >
-                {sidebar}
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div
+              className="p-3 pt-0 [&_aside]:min-h-0 [&_aside]:rounded-none [&_aside]:border-0 [&_aside]:shadow-none [&_aside]:bg-transparent"
+              onClick={handleSidebarClick}
+            >
+              {sidebar}
+            </div>
+          </aside>
+        </>
+      )}
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         <div className="flex gap-4 lg:gap-6 items-start">
@@ -110,7 +120,7 @@ export function AppShell({
       </div>
 
       {showFooter && <Footer fullWidth />}
-      <CookieConsent />
+      <DeferredCookieConsent />
     </div>
   );
 }

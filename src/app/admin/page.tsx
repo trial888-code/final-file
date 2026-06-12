@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Users, Gamepad2, MessageSquare, TrendingUp } from "lucide-react";
+import { Users, Gamepad2, MessageSquare, TrendingUp, Star, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,11 +12,15 @@ export default async function AdminPage() {
     { count: requestCount },
     { count: pendingCount },
     { count: conversationCount },
+    { count: reviewCount },
+    { count: pendingTasks },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("game_requests").select("*", { count: "exact", head: true }),
     supabase.from("game_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("conversations").select("*", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("reviews").select("*", { count: "exact", head: true }),
+    supabase.from("user_task_submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
   const stats = [
@@ -29,6 +33,8 @@ export default async function AdminPage() {
       href: "/admin/requests?status=pending",
     },
     { icon: MessageSquare, label: "Active Chats", value: conversationCount || 0, href: "/admin/chat" },
+    { icon: Star, label: "Reviews", value: reviewCount || 0, href: "/admin/reviews" },
+    { icon: Target, label: "Pending Tasks", value: pendingTasks || 0, href: "/admin/tasks" },
   ];
 
   return (
@@ -47,6 +53,12 @@ export default async function AdminPage() {
         </Button>
         <Button variant="outline" asChild className="w-full sm:w-auto">
           <Link href="/admin/users">Manage Users</Link>
+        </Button>
+        <Button variant="outline" asChild className="w-full sm:w-auto">
+          <Link href="/admin/reviews">Manage Reviews</Link>
+        </Button>
+        <Button variant="outline" asChild className="w-full sm:w-auto">
+          <Link href="/admin/tasks">Review Tasks</Link>
         </Button>
       </div>
 

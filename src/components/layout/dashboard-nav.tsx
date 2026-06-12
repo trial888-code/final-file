@@ -8,8 +8,11 @@ import {
   LayoutDashboard,
   Gamepad2,
   MessageSquare,
+  Banknote,
   Crown,
   Users,
+  Star,
+  Target,
   Shield,
   BarChart3,
   LogOut,
@@ -28,17 +31,24 @@ import { UnreadBadge } from "@/components/ui/unread-badge";
 const userLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/requests", label: "Game Requests", icon: Gamepad2 },
+  { href: "/dashboard/deposits", label: "Deposits", icon: Banknote },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
+  { href: "/dashboard/reviews", label: "Reviews", icon: Star },
+  { href: "/dashboard/tasks", label: "Daily Tasks", icon: Target },
 ];
 
 const adminLinks = [
   { href: "/admin", label: "Admin Panel", icon: Shield },
   { href: "/admin/chat", label: "Customer Chat", icon: MessageSquare },
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/requests", label: "Requests", icon: Gamepad2 },
+  { href: "/admin/game-loads", label: "Wallet Loads", icon: Banknote },
+  { href: "/admin/requests", label: "Game Requests", icon: Gamepad2 },
+  { href: "/admin/deposits", label: "Deposits", icon: Banknote },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/reviews", label: "Reviews", icon: Star },
+  { href: "/admin/tasks", label: "Task Review", icon: Target },
 ];
 
 interface DashboardNavProps {

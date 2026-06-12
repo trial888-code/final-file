@@ -68,7 +68,9 @@ export function AdminUsersList({ users }: AdminUsersListProps) {
                 <WalletCard
                   walletBalance={Number(user.wallet_balance ?? 0)}
                   bonusWallet={Number(user.bonus_wallet ?? 0)}
-                  className="w-full sm:w-56 shrink-0"
+                  cashoutWallet={Number(user.cashout_wallet ?? 0)}
+                  bonusRedeemWallet={Number(user.bonus_redeem_wallet ?? 0)}
+                  className="w-full sm:w-72 shrink-0"
                 />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pt-2 border-t border-border">

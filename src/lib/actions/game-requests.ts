@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { GAMES } from "@/lib/games";
+import { GAMES, UPCOMING_GAME_MESSAGE } from "@/lib/games";
+import { notifyAdminOfGameRequest } from "@/lib/telegram/notify-admin-game-request";
+import { createNotification } from "@/lib/actions/notifications";
 import type { RequestStatus } from "@/types/database";
 
 export async function createGameRequestBySlug(slug: string) {
@@ -12,7 +14,7 @@ export async function createGameRequestBySlug(slug: string) {
 
   const game = GAMES.find((g) => g.slug === slug);
   if (!game) return { error: "Game not found" };
-  if (game.upcoming) return { error: "This game is coming soon" };
+  if (game.upcoming) return { error: UPCOMING_GAME_MESSAGE };
 
   const { data: existing } = await supabase
     .from("game_requests")
@@ -37,6 +39,12 @@ export async function createGameRequestBySlug(slug: string) {
 
   if (error) return { error: error.message };
 
+  void notifyAdminOfGameRequest({
+    userId: user.id,
+    gameName: game.name,
+    gameProvider: game.provider,
+  });
+
   revalidatePath("/dashboard/requests");
   return { success: true, gameName: game.name };
 }
@@ -58,6 +66,13 @@ export async function createGameRequest(formData: FormData) {
   });
 
   if (error) return { error: error.message };
+
+  void notifyAdminOfGameRequest({
+    userId: user.id,
+    gameName,
+    gameProvider,
+    notes: notes || null,
+  });
 
   revalidatePath("/dashboard/requests");
   return { success: true };
@@ -81,6 +96,12 @@ export async function updateRequestStatus(
 
   if (profile?.role !== "admin") return { error: "Unauthorized" };
 
+  const { data: existingRequest } = await supabase
+    .from("game_requests")
+    .select("user_id, game_name, status")
+    .eq("id", requestId)
+    .single();
+
   const update: Record<string, string> = { status };
   if (adminNotes) update.admin_notes = adminNotes;
   if (credentials) update.credentials = credentials;
@@ -92,34 +113,44 @@ export async function updateRequestStatus(
 
   if (error) return { error: error.message };
 
-  if (status === "completed") {
-    const { data: request } = await supabase
-      .from("game_requests")
-      .select("user_id")
-      .eq("id", requestId)
+  if (existingRequest && status === "completed") {
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("vip_points")
+      .eq("id", existingRequest.user_id)
       .single();
 
-    if (request) {
-      const { data: userProfile } = await supabase
+    if (userProfile) {
+      await supabase
         .from("profiles")
-        .select("vip_points")
-        .eq("id", request.user_id)
-        .single();
-
-      if (userProfile) {
-        await supabase
-          .from("profiles")
-          .update({ vip_points: userProfile.vip_points + 50 })
-          .eq("id", request.user_id);
-      }
-
-      await supabase.from("notifications").insert({
-        user_id: request.user_id,
-        title: "Game Account Ready!",
-        message: "Your game account request has been completed. Check your dashboard for credentials.",
-        type: "success",
-      });
+        .update({ vip_points: userProfile.vip_points + 50 })
+        .eq("id", existingRequest.user_id);
     }
+
+    await createNotification(
+      existingRequest.user_id,
+      "Game Account Ready!",
+      `Your ${existingRequest.game_name} account is ready. Open My Requests to view your login credentials.`,
+      "success"
+    );
+  }
+
+  if (existingRequest && status === "rejected") {
+    await createNotification(
+      existingRequest.user_id,
+      "Game Request Update",
+      `Your ${existingRequest.game_name} request could not be completed. Contact support if you have questions.`,
+      "warning"
+    );
+  }
+
+  if (existingRequest && status === "processing") {
+    await createNotification(
+      existingRequest.user_id,
+      "Request In Progress",
+      `We're creating your ${existingRequest.game_name} account. You'll be notified when it's ready.`,
+      "info"
+    );
   }
 
   revalidatePath("/admin/requests");

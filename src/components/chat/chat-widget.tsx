@@ -7,10 +7,15 @@ import { MessageCircle, X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
-import { sendUserMessage, markConversationRead } from "@/lib/actions/messages";
+import {
+  markConversationReadClient,
+  sendMessageClient,
+} from "@/lib/chat/send-message-client";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessageContent } from "@/components/chat/chat-message-content";
 import { formatRelativeTime } from "@/lib/utils";
+import { CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
+import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
 import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
 import { toast } from "sonner";
 import type { Message } from "@/types/database";
@@ -27,6 +32,12 @@ export function ChatWidget() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+  const messageFingerprint = messages.length > 0 ? messages[messages.length - 1]?.id : "";
+  const { onScroll: onScrollMessages } = useChatAutoScroll(
+    scrollRef,
+    messages.length,
+    messageFingerprint
+  );
 
   useEffect(() => {
     if (!supabase) {
@@ -81,10 +92,10 @@ export function ChatWidget() {
   }, [open, initChat, supabase, isLoggedIn]);
 
   useEffect(() => {
-    if (open && conversationId && !isLoggedIn) {
-      void markConversationRead(conversationId);
+    if (open && conversationId && !isLoggedIn && supabase && userId) {
+      void markConversationReadClient(supabase, conversationId, userId);
     }
-  }, [open, conversationId, isLoggedIn]);
+  }, [open, conversationId, isLoggedIn, supabase, userId]);
 
   useEffect(() => {
     if (!conversationId || !supabase || isLoggedIn) return;
@@ -104,6 +115,7 @@ export function ChatWidget() {
           setMessages((prev) => [...prev, msg]);
           if (userId && msg.sender_id !== userId) {
             playIncomingMessageSound(msg.sender_id, userId);
+            setOpen(true);
           }
         }
       )
@@ -112,11 +124,7 @@ export function ChatWidget() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, supabase, isLoggedIn]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [conversationId, supabase, isLoggedIn, userId]);
 
   async function handleSend(file: File | null): Promise<boolean> {
     if ((!input.trim() && !file) || !conversationId || !userId) return false;
@@ -144,7 +152,13 @@ export function ChatWidget() {
       attachment = uploadResult.data;
     }
 
-    const result = await sendUserMessage(conversationId, content, attachment);
+    const result = await sendMessageClient(supabase, {
+      conversationId,
+      senderId: userId,
+      content,
+      attachment,
+      kind: "user",
+    });
 
     if (result.error) {
       toast.error(result.error);
@@ -153,12 +167,11 @@ export function ChatWidget() {
       return false;
     }
 
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-    if (msgs) setMessages(msgs);
+    if (result.message) {
+      setMessages((prev) =>
+        prev.some((m) => m.id === result.message!.id) ? prev : [...prev, result.message!]
+      );
+    }
 
     setLoading(false);
     return true;
@@ -195,7 +208,11 @@ export function ChatWidget() {
               </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 sm:h-72 sm:flex-none">
+            <div
+              ref={scrollRef}
+              onScroll={onScrollMessages}
+              className={`${CHAT_SCROLL_CLASS} p-4 space-y-3`}
+            >
               {!supabase ? (
                 <p className="text-sm text-muted-foreground text-center py-8">Chat unavailable</p>
               ) : !userId ? (

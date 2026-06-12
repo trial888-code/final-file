@@ -1,22 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import dynamic from "next/dynamic";
+import { useState, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Search } from "lucide-react";
-import { Hero } from "@/components/home/hero";
-import { GameSlider } from "@/components/home/game-slider";
 import { HomeSidebar, SIDEBAR_LINKS } from "@/components/home/home-sidebar";
-import { WalletCardLoader } from "@/components/wallet/wallet-card-loader";
+import { DeferredWalletCardLoader } from "@/components/wallet/deferred-wallet-card-loader";
 import { AppShell } from "@/components/layout/app-shell";
 import { GameCard } from "@/components/home/game-card";
-import { HowItWorks } from "@/components/home/how-it-works";
-import { VipPreview } from "@/components/home/vip-preview";
-import { ReferralPreview } from "@/components/home/referral-preview";
-import { ActivityFeed } from "@/components/home/activity-feed";
-import { Testimonials } from "@/components/home/testimonials";
-import { FaqSection } from "@/components/home/faq-section";
-import { ActivityToast } from "@/components/ui/ActivityToast";
+import { PublicReviewsSection } from "@/components/home/public-reviews-section";
 import {
   filterGames,
   filterHomeGames,
@@ -27,13 +19,53 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { LazyWhenVisible } from "@/components/ui/lazy-when-visible";
+
+function SectionPlaceholder() {
+  return <div className="h-32 rounded-xl bg-white/[0.03] animate-pulse" aria-hidden />;
+}
+
+const GameSlider = dynamic(
+  () => import("@/components/home/game-slider").then((m) => m.GameSlider),
+  { loading: () => <SectionPlaceholder /> }
+);
+const HowItWorks = dynamic(
+  () => import("@/components/home/how-it-works").then((m) => m.HowItWorks),
+  { loading: () => <SectionPlaceholder /> }
+);
+const VipPreview = dynamic(
+  () => import("@/components/home/vip-preview").then((m) => m.VipPreview),
+  { loading: () => <SectionPlaceholder /> }
+);
+const ReferralPreview = dynamic(
+  () => import("@/components/home/referral-preview").then((m) => m.ReferralPreview),
+  { loading: () => <SectionPlaceholder /> }
+);
+const ActivityFeed = dynamic(
+  () => import("@/components/home/activity-feed").then((m) => m.ActivityFeed),
+  { loading: () => <SectionPlaceholder /> }
+);
+const FaqSection = dynamic(
+  () => import("@/components/home/faq-section").then((m) => m.FaqSection),
+  { loading: () => <SectionPlaceholder /> }
+);
+const ActivityToast = dynamic(
+  () => import("@/components/ui/ActivityToast").then((m) => m.ActivityToast),
+  { ssr: false, loading: () => null }
+);
+
 const MAIN_TABS: { id: HomeGameTab; label: string }[] = [
   { id: "trending", label: "Most Trending Games" },
   { id: "all", label: "All" },
   { id: "promotional", label: "Promotional Games" },
 ];
 
-export function HomeLandingShell() {
+interface HomeLandingShellProps {
+  /** Server-rendered hero for fast LCP on mobile */
+  hero?: ReactNode;
+}
+
+export function HomeLandingShell({ hero }: HomeLandingShellProps) {
   const router = useRouter();
   const [sidebarTab, setSidebarTab] = useState<GameTab>("all");
   const [mainTab, setMainTab] = useState<HomeGameTab>("trending");
@@ -78,14 +110,15 @@ export function HomeLandingShell() {
           activeTab={sidebarTab}
           onTabChange={handleSidebarTab}
           onSearchClick={handleHeaderSearch}
-          walletSlot={<WalletCardLoader />}
+          walletSlot={<DeferredWalletCardLoader />}
         />
       }
     >
       <div className="space-y-8">
-        <Hero />
-
-        <GameSlider />
+        {hero}
+        <LazyWhenVisible rootMargin="150px" placeholder={<SectionPlaceholder />}>
+          <GameSlider />
+        </LazyWhenVisible>
 
         <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
           {SIDEBAR_LINKS.map(({ id, label, icon: Icon }) => (
@@ -123,10 +156,7 @@ export function HomeLandingShell() {
                 >
                   {t.label}
                   {!useSidebarFilter && mainTab === t.id && (
-                    <motion.span
-                      layoutId="game-tab-underline"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"
-                    />
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-full" />
                   )}
                 </button>
               ))}
@@ -144,35 +174,41 @@ export function HomeLandingShell() {
             </div>
           </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${useSidebarFilter ? sidebarTab : mainTab}-${search}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4"
-            >
-              {displayGames.length > 0 ? (
-                displayGames.map((game) => <GameCard key={game.id} game={game} />)
-              ) : (
-                <p className="col-span-full text-center py-12 text-muted-foreground">
-                  No games found.
-                </p>
-              )}
-            </motion.div>
-          </AnimatePresence>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            {displayGames.length > 0 ? (
+              displayGames.map((game, index) => (
+                <GameCard key={game.id} game={game} eager={index < 6} />
+              ))
+            ) : (
+              <p className="col-span-full text-center py-12 text-muted-foreground">
+                No games found.
+              </p>
+            )}
+          </div>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
             {displayGames.length} of {GAMES.length} games
           </p>
         </section>
 
-        <HowItWorks />
-        <VipPreview />
-        <ReferralPreview />
-        <ActivityFeed />
-        <Testimonials />
-        <FaqSection />
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <HowItWorks />
+        </LazyWhenVisible>
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <VipPreview />
+        </LazyWhenVisible>
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <ReferralPreview />
+        </LazyWhenVisible>
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <ActivityFeed />
+        </LazyWhenVisible>
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <PublicReviewsSection />
+        </LazyWhenVisible>
+        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
+          <FaqSection />
+        </LazyWhenVisible>
       </div>
 
       <ActivityToast />

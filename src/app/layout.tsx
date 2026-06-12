@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Toaster } from "sonner";
 import { OrganizationSchema, WebsiteSchema } from "@/lib/seo/json-ld";
 import { homeMetadata } from "@/lib/seo/metadata";
-import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
-import { MessageRealtimeProvider } from "@/components/chat/message-realtime-provider";
+import { ClientProviders } from "@/components/providers/client-providers";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  preload: true,
+  adjustFontFallback: true,
+});
 
 export const metadata: Metadata = homeMetadata;
 
@@ -15,6 +18,7 @@ export const viewport: Viewport = {
   themeColor: "#121212",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,14 +27,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <OrganizationSchema />
         <WebsiteSchema />
-        <link rel="icon" href="/logo.jpeg" />
+        <link rel="icon" href="/logo.webp" />
+        <link rel="preload" href="/logo.webp" as="image" type="image/webp" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <MessageRealtimeProvider>
-          {children}
-          <ChatWidgetLoader />
-        </MessageRealtimeProvider>
-        <Toaster theme="dark" position="top-right" richColors />
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

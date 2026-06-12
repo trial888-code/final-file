@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
-import { sendAdminMessage, ensureAdminConversation } from "@/lib/actions/admin";
+import { ensureAdminConversation } from "@/lib/actions/admin";
+import { sendMessageClient } from "@/lib/chat/send-message-client";
 import { getAdminConversationUnreads, type AdminConversationUnread } from "@/lib/actions/messages";
 import { uploadChatAttachment } from "@/lib/chat/attachments";
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -14,7 +15,13 @@ import { MobileChatShell } from "@/components/chat/mobile-chat-shell";
 import { AdminUserSearch } from "@/components/admin/admin-user-search";
 import { UnreadBadge } from "@/components/ui/unread-badge";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
-import { cn, formatRelativeTime, createClientId } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { CHAT_INBOX_CARD_CLASS, CHAT_SCROLL_CLASS } from "@/lib/chat/chat-layout";
+import { useChatAutoScroll } from "@/lib/chat/use-chat-auto-scroll";
+import { CHAT_INCOMING_EVENT, type ChatIncomingDetail } from "@/lib/chat/events";
+import { playIncomingMessageSound } from "@/lib/chat/message-notification-sound";
+import { subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
+import { isUserOnline } from "@/lib/presence/utils";
 import { toast } from "sonner";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import type { Message } from "@/types/database";
@@ -23,6 +30,7 @@ interface ConversationUser {
   full_name?: string | null;
   email?: string;
   is_online?: boolean;
+  last_seen_at?: string | null;
 }
 
 export interface AdminConversation {
@@ -57,6 +65,7 @@ interface AdminChatPanelProps {
   onSend: (file: File | null) => Promise<boolean>;
   loading: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
+  onScrollMessages?: () => void;
 }
 
 function AdminChatPanel({
@@ -71,9 +80,10 @@ function AdminChatPanel({
   onSend,
   loading,
   scrollRef,
+  onScrollMessages,
 }: AdminChatPanelProps) {
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
       <div className="p-3 sm:p-4 border-b border-white/10 flex items-center gap-2 sm:gap-3 bg-[#121212] shrink-0">
         {showMobileBack && (
           <Button
@@ -92,16 +102,34 @@ function AdminChatPanel({
           </h2>
           <p className="text-xs text-muted-foreground truncate">
             {displayContact(selected?.user)}
+            {selected?.user && (
+              <span
+                className={cn(
+                  "ml-2",
+                  isUserOnline(selected.user.last_seen_at) ? "text-emerald-400" : "text-muted-foreground"
+                )}
+              >
+                · {isUserOnline(selected.user.last_seen_at) ? "Online" : "Offline"}
+              </span>
+            )}
           </p>
         </div>
-        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shrink-0">
-          Live
+        <Badge
+          className={cn(
+            "shrink-0",
+            isUserOnline(selected?.user?.last_seen_at)
+              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+              : "bg-white/5 text-muted-foreground border-white/10"
+          )}
+        >
+          {isUserOnline(selected?.user?.last_seen_at) ? "Online" : "Offline"}
         </Badge>
       </div>
 
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]"
+        onScroll={onScrollMessages}
+        className={`${CHAT_SCROLL_CLASS} p-3 sm:p-4 pb-4 space-y-3 bg-[#0f0f0f]`}
       >
         {messages.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
@@ -145,9 +173,9 @@ function AdminChatPanel({
         disabled={!selectedId}
         placeholder="Type a message..."
         showSendLabel
-        className="bg-[#121212] border-white/10"
+        className="bg-[#121212] border-white/10 shrink-0"
       />
-    </>
+    </div>
   );
 }
 
@@ -162,8 +190,60 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialUserHandled = useRef(false);
+  const selectedIdRef = useRef(selectedId);
+  const unreadsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const { refresh: refreshGlobalUnread } = useUnreadMessages();
+
+  selectedIdRef.current = selectedId;
+  const conversationUserIdsRef = useRef<string[]>([]);
+  conversationUserIdsRef.current = conversations.map((c) => c.user_id);
+
+  const selectConversation = useCallback((id: string, options?: { openMobile?: boolean }) => {
+    setSelectedId(id);
+    if (options?.openMobile !== false) {
+      setMobileChatOpen(true);
+    }
+  }, []);
+
+  const refreshOnlineStatus = useCallback(async () => {
+    if (!supabase) return;
+    const userIds = conversationUserIdsRef.current.filter(Boolean);
+    if (userIds.length === 0) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, last_seen_at, is_online")
+      .in("id", userIds);
+
+    if (!data) return;
+
+    const byId = new Map(data.map((row) => [row.id, row]));
+
+    setConversations((prev) =>
+      prev.map((conv) => {
+        const profile = byId.get(conv.user_id);
+        if (!profile) return conv;
+        return {
+          ...conv,
+          user: {
+            ...conv.user,
+            full_name: conv.user?.full_name ?? null,
+            email: conv.user?.email,
+            last_seen_at: profile.last_seen_at,
+            is_online: isUserOnline(profile.last_seen_at),
+          },
+        };
+      })
+    );
+  }, [supabase]);
+
+  const messageFingerprint = messages.length > 0 ? messages[messages.length - 1]?.id : "";
+  const { onScroll: onScrollMessages } = useChatAutoScroll(
+    scrollRef,
+    messages.length,
+    messageFingerprint
+  );
 
   const selected = conversations.find((c) => c.id === selectedId);
 
@@ -175,6 +255,13 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
     }
     setUnreads(map);
   }, []);
+
+  const scheduleLoadUnreads = useCallback(() => {
+    if (unreadsDebounceRef.current) clearTimeout(unreadsDebounceRef.current);
+    unreadsDebounceRef.current = setTimeout(() => {
+      void loadUnreads();
+    }, 150);
+  }, [loadUnreads]);
 
   const loadMessages = useCallback(
     async (conversationId: string) => {
@@ -211,55 +298,57 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
   }, [supabase, loadUnreads]);
 
   useEffect(() => {
-    if (!supabase || !adminId || conversations.length === 0) return;
+    if (!supabase || !adminId) return;
 
-    const channels: ReturnType<typeof supabase.channel>[] = [];
+    return subscribeToMessageInserts(supabase, `admin-inbox-${adminId}`, adminId, (msg) => {
+      playIncomingMessageSound(msg.sender_id, adminId);
+      scheduleLoadUnreads();
 
-    for (const conv of conversations) {
-      const channel = supabase
-        .channel(`admin-list-${conv.id}-${createClientId()}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: `conversation_id=eq.${conv.id}`,
-          },
-          (payload) => {
-            const msg = payload.new as Message;
-            if (msg.sender_id === adminId) return;
-            void loadUnreads();
-            if (conv.id === selectedId) {
-              setMessages((prev) =>
-                prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
-              );
-              void loadMessages(conv.id);
-            }
-          }
-        )
-        .subscribe();
-      channels.push(channel);
+      if (msg.conversation_id === selectedIdRef.current) {
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        void supabase
+          .from("messages")
+          .update({ is_read: true })
+          .eq("id", msg.id)
+          .then(() => refreshGlobalUnread());
+        return;
+      }
+
+      selectConversation(msg.conversation_id);
+      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    });
+  }, [supabase, adminId, scheduleLoadUnreads, refreshGlobalUnread, selectConversation]);
+
+  useEffect(() => {
+    function onChatIncoming(event: Event) {
+      const { conversationId } = (event as CustomEvent<ChatIncomingDetail>).detail;
+      if (!conversationId) return;
+      if (conversationId === selectedIdRef.current) {
+        setMobileChatOpen(true);
+        return;
+      }
+      selectConversation(conversationId);
+      void loadMessages(conversationId);
     }
 
-    return () => {
-      for (const ch of channels) supabase.removeChannel(ch);
-    };
-  }, [conversations, supabase, adminId, selectedId, loadUnreads, loadMessages]);
+    window.addEventListener(CHAT_INCOMING_EVENT, onChatIncoming);
+    return () => window.removeEventListener(CHAT_INCOMING_EVENT, onChatIncoming);
+  }, [selectConversation, loadMessages]);
+
+  useEffect(() => {
+    void refreshOnlineStatus();
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshOnlineStatus();
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [refreshOnlineStatus]);
 
   useEffect(() => {
     if (!selectedId || !supabase) return;
     loadMessages(selectedId);
   }, [selectedId, supabase, loadMessages]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  function selectConversation(id: string) {
-    setSelectedId(id);
-    setMobileChatOpen(true);
-  }
 
   const startChatWithUser = useCallback(
     async (userId: string) => {
@@ -294,7 +383,7 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
         toast.error("Could not start chat. Try again.");
       }
     },
-    [conversations]
+    [conversations, selectConversation]
   );
 
   useEffect(() => {
@@ -329,7 +418,13 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
       attachment = uploadResult.data;
     }
 
-    const result = await sendAdminMessage(selectedId, content, attachment);
+    const result = await sendMessageClient(supabase, {
+      conversationId: selectedId,
+      senderId: adminId!,
+      content,
+      attachment,
+      kind: "admin",
+    });
     if (result.error) {
       toast.error(result.error);
       setInput(content);
@@ -337,7 +432,12 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
       return false;
     }
 
-    await loadMessages(selectedId);
+    if (result.message) {
+      setMessages((prev) =>
+        prev.some((m) => m.id === result.message!.id) ? prev : [...prev, result.message!]
+      );
+    }
+
     setConversations((prev) =>
       prev.map((c) =>
         c.id === selectedId ? { ...c, updated_at: new Date().toISOString() } : c
@@ -357,18 +457,26 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
     onSend: handleSend,
     loading,
     scrollRef,
+    onScrollMessages,
   };
 
+  const onlineCount = conversations.filter((c) => isUserOnline(c.user?.last_seen_at)).length;
+
   const customerList = (
-    <>
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
       <div className="p-3 sm:p-4 border-b border-white/10 shrink-0 space-y-3">
         <div>
           <h2 className="font-semibold text-white">Customers</h2>
-          <p className="text-xs text-muted-foreground">{conversations.length} active chat(s)</p>
+          <p className="text-xs text-muted-foreground">
+            {conversations.length} active chat(s)
+            {onlineCount > 0 && (
+              <span className="text-emerald-400"> · {onlineCount} online now</span>
+            )}
+          </p>
         </div>
         <AdminUserSearch onStartChat={startChatWithUser} />
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className={`${CHAT_SCROLL_CLASS} p-2 space-y-1`}>
         {conversations.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8 px-3">
             Search for a user above to start a conversation.
@@ -378,6 +486,7 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
             const user = conv.user;
             const isActive = conv.id === selectedId;
             const meta = unreads[conv.id];
+            const online = isUserOnline(user?.last_seen_at);
             return (
               <button
                 key={conv.id}
@@ -394,12 +503,16 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
                   <span
                     className={cn(
                       "w-2 h-2 rounded-full flex-shrink-0",
-                      user?.is_online ? "bg-green-400" : "bg-gray-500"
+                      online ? "bg-green-400" : "bg-gray-500"
                     )}
+                    title={online ? "Online" : "Offline"}
                   />
                   <span className="font-medium text-sm truncate text-white flex-1">
                     {user?.full_name || "Customer"}
                   </span>
+                  {online && (
+                    <span className="text-[10px] text-emerald-400 shrink-0 font-medium">Online</span>
+                  )}
                   {meta?.lastMessageAt && (
                     <span className="text-[10px] text-muted-foreground shrink-0">
                       {formatRelativeTime(meta.lastMessageAt)}
@@ -420,16 +533,16 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
           })
         )}
       </div>
-    </>
+    </div>
   );
 
   return (
     <>
-      <Card className="overflow-hidden border-white/10 bg-[#161616]">
-        <div className="grid grid-cols-1 md:grid-cols-3 min-h-[60vh] md:min-h-[70vh]">
+      <Card className={CHAT_INBOX_CARD_CLASS}>
+        <div className="grid grid-cols-1 md:grid-cols-3 md:grid-rows-1 flex-1 min-h-0 h-full overflow-hidden">
           <div
             className={cn(
-              "border-r border-white/10 flex flex-col bg-[#141414] min-h-[50vh] md:min-h-0",
+              "border-r border-white/10 flex flex-col min-h-0 h-full overflow-hidden bg-[#141414]",
               mobileChatOpen ? "hidden md:flex" : "flex"
             )}
           >
@@ -437,7 +550,7 @@ export function AdminChatInbox({ conversations: initialConversations, initialUse
           </div>
 
           {/* Desktop chat panel */}
-          <div className="hidden md:flex md:col-span-2 flex-col min-h-[70vh] min-h-0 overflow-hidden">
+          <div className="hidden md:flex md:col-span-2 flex-col min-h-0 h-full overflow-hidden">
             {selectedId ? (
               <AdminChatPanel {...chatPanelProps} />
             ) : (

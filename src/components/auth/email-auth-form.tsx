@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { DEFAULT_COUNTRY_ISO, PhoneNumberInput, phoneFromParts } from "@/components/auth/phone-number-input";
-import { buildAuthCallbackUrl } from "@/lib/auth/callback-url";
+import { buildAuthCallbackUrl, getEmailAuthOrigin } from "@/lib/auth/callback-url";
 import { normalizeEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
 import {
   finalizeRegistrationAfterSignUp,
@@ -58,8 +58,8 @@ function EmailConfirmationNotice({
         )}
       </p>
       <p className="text-xs text-muted-foreground">
-        Open the link in the <strong className="text-foreground">same browser</strong> you used to
-        register. Each link works once — request a new one from Sign In if it expired.
+        Open the link in any browser on your phone or computer. Each link works once —
+        use Sign In to request a new one if it expired.
       </p>
       <p className="text-xs text-muted-foreground">Check spam if you don&apos;t see it in 1–2 minutes.</p>
       <Link href="/login" className="inline-block text-sm text-primary hover:underline">
@@ -69,13 +69,14 @@ function EmailConfirmationNotice({
   );
 }
 
-export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromUrl }: EmailAuthFormProps) {
+export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: EmailAuthFormProps) {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [countryIso, setCountryIso] = useState(DEFAULT_COUNTRY_ISO);
   const [phoneLocal, setPhoneLocal] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [referralCode, setReferralCode] = useState(referralCodeFromUrl || "");
   const [loading, setLoading] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
@@ -135,9 +136,21 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
       return;
     }
 
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      setLoading(false);
+      return;
+    }
+
     const normalizedEmail = normalizeEmail(email);
     const emailRedirectTo = buildAuthCallbackUrl(
-      window.location.origin,
+      getEmailAuthOrigin(window.location.origin),
       redirect,
       referralCode.trim() || referralCodeFromUrl || undefined
     );
@@ -158,7 +171,8 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
 
     if (error) {
       setLoading(false);
-      toast.error(formatAuthErrorMessage(error.message));
+      console.error("[auth] signUp failed:", error);
+      toast.error(formatAuthErrorMessage(error));
       return;
     }
 
@@ -171,6 +185,23 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
     if (data.user.identities?.length === 0) {
       setLoading(false);
       toast.error("This email is already registered. Go to Sign In instead.");
+      return;
+    }
+
+    const needsConfirmation = !data.user.email_confirmed_at;
+
+    if (needsConfirmation) {
+      // Do not signOut — it clears PKCE cookies and breaks the confirmation link
+      setLoading(false);
+      setPendingEmail(normalizedEmail);
+      setAwaitingConfirmation(true);
+      toast.success("Account created! Check your email and click the link to verify.");
+      void finalizeRegistrationAfterSignUp({
+        userId: data.user.id,
+        fullName: fullName.trim(),
+        email: normalizedEmail,
+        phone,
+      });
       return;
     }
 
@@ -202,20 +233,9 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
     if (!saved.ok) {
       setLoading(false);
       toast.error(saved.error ?? "Account created but phone was not saved");
-      if (!data.session) return;
-      toast.message("You can add your phone from the dashboard.");
-    }
-
-    // Email confirmation enabled — no session until user clicks email link
-    if (!data.session) {
-      setLoading(false);
-      setPendingEmail(normalizedEmail);
-      setAwaitingConfirmation(true);
-      toast.success("Account created! Check your email to confirm.");
       return;
     }
 
-    // Instant login (Confirm email OFF in Supabase)
     setLoading(false);
     toast.success("Account created! Welcome to Spinora.");
     router.push(redirect);
@@ -271,7 +291,10 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
         <div className="flex justify-between">
           <Label htmlFor="password">Password</Label>
           {mode === "login" && (
-            <Link href="/reset-password" className="text-xs text-primary hover:underline">
+            <Link
+              href="/reset-password"
+              className="text-sm text-primary hover:underline font-medium"
+            >
               Forgot password?
             </Link>
           )}
@@ -283,8 +306,23 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={mode === "register" ? 6 : undefined}
+          placeholder={mode === "register" ? "At least 6 characters" : undefined}
         />
       </div>
+      {mode === "register" && (
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={6}
+            placeholder="Re-enter your password"
+          />
+        </div>
+      )}
       {mode === "register" && (
         <div className="space-y-2">
           <Label htmlFor="referral">Referral Code (optional)</Label>
@@ -308,7 +346,7 @@ export function EmailAuthForm({ mode, redirect = "/dashboard", referralCodeFromU
       </Button>
       {mode === "register" && (
         <p className="text-xs text-muted-foreground text-center">
-          Create your account and start playing right away.
+          After Create Account, check your inbox and click the confirmation link to sign in.
         </p>
       )}
       {mode === "login" && (

@@ -13,6 +13,7 @@ export const config = {
     "/login",
     "/register",
     "/reset-password",
+    "/reset-password/update",
     "/auth/callback",
   ],
 };

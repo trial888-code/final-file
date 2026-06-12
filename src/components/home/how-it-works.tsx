@@ -13,7 +13,7 @@ const steps = [
   {
     icon: Gamepad2,
     title: "Request Game Account",
-    description: "Choose from 13+ popular gaming platforms and submit your request.",
+    description: "Choose from 14+ popular gaming platforms and submit your request.",
   },
   {
     icon: Crown,

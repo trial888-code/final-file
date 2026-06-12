@@ -29,7 +29,11 @@ export function WalletCardLoader({ className, refreshKey = 0 }: WalletCardLoader
   }, [load, refreshKey]);
 
   useEffect(() => {
+    let lastFetch = 0;
     function onFocus() {
+      const now = Date.now();
+      if (now - lastFetch < 60_000) return;
+      lastFetch = now;
       load();
     }
     window.addEventListener("focus", onFocus);
@@ -53,6 +57,8 @@ export function WalletCardLoader({ className, refreshKey = 0 }: WalletCardLoader
     <WalletCard
       walletBalance={wallet.walletBalance}
       bonusWallet={wallet.bonusWallet}
+      cashoutWallet={wallet.cashoutWallet}
+      bonusRedeemWallet={wallet.bonusRedeemWallet}
       className={className}
     />
   );

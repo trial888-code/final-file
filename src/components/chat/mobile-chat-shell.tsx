@@ -30,7 +30,7 @@ export function MobileChatShell({ open, children, className }: MobileChatShellPr
   return createPortal(
     <div
       className={cn(
-        "fixed inset-x-0 top-14 bottom-0 z-[200] flex flex-col bg-[#0f0f0f] md:hidden",
+        "fixed inset-x-0 top-14 bottom-0 z-[200] flex flex-col min-h-0 overflow-hidden bg-[#0f0f0f] md:hidden",
         className
       )}
       role="dialog"

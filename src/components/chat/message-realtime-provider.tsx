@@ -1,50 +1,85 @@
 "use client";
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Headphones, MessageCircle, User, X } from "lucide-react";
+import { Headphones, MessageCircle, User, X, Gamepad2, CheckCircle, Target, Banknote } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getAdminUnreadMessageCount,
   getUnreadMessageCount,
 } from "@/lib/actions/messages";
 import { UnreadBadge } from "@/components/ui/unread-badge";
-import { createClientId } from "@/lib/utils";
+import { SitePresenceHeartbeat } from "@/components/presence/site-presence-heartbeat";
+import {
+  CHAT_INCOMING_EVENT,
+  GAME_REQUEST_EVENT,
+  DEPOSIT_REQUEST_EVENT,
+  TASK_SUBMISSION_EVENT,
+  type ChatIncomingDetail,
+  type DepositRequestEventDetail,
+  type GameRequestEventDetail,
+  type TaskSubmissionEventDetail,
+} from "@/lib/chat/events";
+import { getDepositMethod } from "@/lib/payments/methods";
+import type { DepositPaymentMethodId } from "@/lib/payments/methods";
+import { getTaskById } from "@/lib/tasks/definitions";
+import { subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
+import {
+  MessageRealtimeContext,
+} from "@/lib/chat/message-realtime-context";
 import {
   playIncomingMessageSound,
+  playMessageNotificationSound,
+  resumeMessageNotificationAudio,
   unlockMessageNotificationSound,
 } from "@/lib/chat/message-notification-sound";
-import type { Message } from "@/types/database";
+import type { GameRequest, Message } from "@/types/database";
+import type { TaskSubmission } from "@/lib/tasks/types";
 
-interface IncomingPopup {
+type ActivityPopupKind =
+  | "message"
+  | "game_request_new"
+  | "game_request_update"
+  | "task_submission_new"
+  | "task_submission_review"
+  | "deposit_new";
+
+interface ActivityPopup {
   id: string;
-  conversationId: string;
+  kind: ActivityPopupKind;
   title: string;
   preview: string;
+  href: string;
   isAdminView: boolean;
 }
 
-interface MessageRealtimeContextValue {
-  count: number;
-  isAdmin: boolean;
-  refresh: () => Promise<void>;
+function isOnRequestsPage(path: string | null, adminView: boolean): boolean {
+  if (adminView) return Boolean(path?.startsWith("/admin/requests"));
+  return Boolean(path?.startsWith("/dashboard/requests"));
 }
 
-const MessageRealtimeContext = createContext<MessageRealtimeContextValue>({
-  count: 0,
-  isAdmin: false,
-  refresh: async () => {},
-});
+function isOnDepositsPage(path: string | null, adminView: boolean): boolean {
+  if (adminView) return Boolean(path?.startsWith("/admin/deposits"));
+  return Boolean(path?.startsWith("/dashboard/deposits"));
+}
+
+function isOnTasksPage(path: string | null, adminView: boolean): boolean {
+  if (adminView) return Boolean(path?.startsWith("/admin/tasks"));
+  return Boolean(path?.startsWith("/dashboard/tasks"));
+}
+
+function isOnChatInboxPage(path: string | null, adminView: boolean): boolean {
+  if (adminView) return Boolean(path?.startsWith("/admin/chat"));
+  return Boolean(path?.startsWith("/dashboard/messages"));
+}
 
 function messagePreview(msg: Pick<Message, "content" | "attachment_type">): string {
   if (msg.content.trim()) return msg.content;
@@ -59,11 +94,20 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const [count, setCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [popup, setPopup] = useState<IncomingPopup | null>(null);
+  const [popup, setPopup] = useState<ActivityPopup | null>(null);
   const [conversationIds, setConversationIds] = useState<string[]>([]);
   const userIdRef = useRef<string | null>(null);
   const isAdminRef = useRef(false);
+  const pathnameRef = useRef(pathname);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openingChatRef = useRef(false);
+  const openingActivityRef = useRef(false);
+
+  pathnameRef.current = pathname;
+
+  const onInboxPage =
+    pathname?.startsWith("/admin/chat") || pathname?.startsWith("/dashboard/messages");
 
   const syncConversations = useCallback(async () => {
     const supabase = createClient();
@@ -104,22 +148,34 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
           .eq("is_active", true);
 
     const { data: conversations } = await query;
-    setConversationIds(conversations?.map((c) => c.id) ?? []);
+    const ids = conversations?.map((c) => c.id) ?? [];
+    setConversationIds(ids);
 
-    const total = admin ? await getAdminUnreadMessageCount() : await getUnreadMessageCount();
-    setCount(total);
+    void (admin ? getAdminUnreadMessageCount() : getUnreadMessageCount()).then((total) => {
+      setCount(total);
+    });
   }, []);
 
   const refresh = useCallback(async () => {
     await syncConversations();
   }, [syncConversations]);
 
-  const showPopup = useCallback(
-    async (msg: Message) => {
-      const adminView = isAdminRef.current;
+  const scheduleRefresh = useCallback(() => {
+    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    refreshDebounceRef.current = setTimeout(() => {
+      void syncConversations();
+    }, 200);
+  }, [syncConversations]);
 
-      if (adminView && pathname?.startsWith("/admin/chat")) return;
-      if (!adminView && pathname?.startsWith("/dashboard/messages")) return;
+  const showActivityPopup = useCallback((popupData: ActivityPopup) => {
+    setPopup(popupData);
+    if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+    popupTimerRef.current = setTimeout(() => setPopup(null), 6000);
+  }, []);
+
+  const showMessagePopup = useCallback(
+    async (msg: Message, href: string) => {
+      const adminView = isAdminRef.current;
 
       let title = adminView ? "New customer message" : "Spinora Support";
 
@@ -135,95 +191,611 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setPopup({
+      showActivityPopup({
         id: msg.id,
-        conversationId: msg.conversation_id,
+        kind: "message",
         title,
         preview: messagePreview(msg),
+        href,
         isAdminView: adminView,
       });
-
-      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
-      popupTimerRef.current = setTimeout(() => setPopup(null), 8000);
     },
-    [pathname]
+    [showActivityPopup]
   );
+
+  const openChatForMessage = useCallback(
+    async (msg: Message) => {
+      const userId = userIdRef.current;
+      if (!userId || msg.sender_id === userId) return;
+
+      const adminView = isAdminRef.current;
+      const path = pathnameRef.current;
+
+      playIncomingMessageSound(msg.sender_id, userId);
+      setCount((c) => c + 1);
+      scheduleRefresh();
+
+      if (isOnChatInboxPage(path, adminView)) {
+        window.dispatchEvent(
+          new CustomEvent<ChatIncomingDetail>(CHAT_INCOMING_EVENT, {
+            detail: { conversationId: msg.conversation_id },
+          })
+        );
+        return;
+      }
+
+      if (openingChatRef.current) return;
+      openingChatRef.current = true;
+
+      try {
+        let msgHref = adminView ? "/admin/chat" : `/dashboard/messages?conversation=${msg.conversation_id}`;
+
+        if (adminView) {
+          const supabase = createClient();
+          const { data: conv } = supabase
+            ? await supabase
+                .from("conversations")
+                .select("user_id")
+                .eq("id", msg.conversation_id)
+                .single()
+            : { data: null };
+
+          msgHref = conv?.user_id ? `/admin/chat?userId=${conv.user_id}` : "/admin/chat";
+          router.push(msgHref);
+        } else {
+          router.push(msgHref);
+        }
+
+        void showMessagePopup(msg, msgHref);
+      } finally {
+        setTimeout(() => {
+          openingChatRef.current = false;
+        }, 300);
+      }
+    },
+    [router, scheduleRefresh, showMessagePopup]
+  );
+
+  const openGameRequestActivity = useCallback(
+    async (
+      request: Pick<GameRequest, "id" | "game_name" | "status" | "user_id">,
+      kind: GameRequestEventDetail["kind"]
+    ) => {
+      const adminView = isAdminRef.current;
+      const path = pathnameRef.current;
+
+      void playMessageNotificationSound();
+
+      const eventDetail: GameRequestEventDetail = { kind, requestId: request.id };
+      window.dispatchEvent(
+        new CustomEvent<GameRequestEventDetail>(GAME_REQUEST_EVENT, { detail: eventDetail })
+      );
+
+      const href = adminView ? "/admin/requests?status=pending" : "/dashboard/requests";
+
+      let title = adminView ? "New game request" : "Game Account Ready!";
+      let preview = adminView
+        ? `${request.game_name} requested`
+        : `Your ${request.game_name} account is ready`;
+
+      if (adminView && kind === "new") {
+        const supabase = createClient();
+        if (supabase) {
+          const { data: customer } = await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", request.user_id)
+            .single();
+          const name = customer?.full_name || customer?.email?.split("@")[0] || "Customer";
+          title = name;
+          preview = `Requested ${request.game_name} — tap to review`;
+        }
+      }
+
+      if (!adminView && request.status === "rejected") {
+        title = "Game request update";
+        preview = `Your ${request.game_name} request was not completed`;
+      } else if (!adminView && request.status === "processing") {
+        title = "Request in progress";
+        preview = `We're creating your ${request.game_name} account`;
+      }
+
+      if (isOnRequestsPage(path, adminView)) {
+        showActivityPopup({
+          id: request.id,
+          kind: adminView ? "game_request_new" : "game_request_update",
+          title,
+          preview,
+          href,
+          isAdminView: adminView,
+        });
+        return;
+      }
+
+      if (openingActivityRef.current) return;
+      openingActivityRef.current = true;
+
+      try {
+        showActivityPopup({
+          id: request.id,
+          kind: adminView ? "game_request_new" : "game_request_update",
+          title,
+          preview,
+          href,
+          isAdminView: adminView,
+        });
+
+        router.push(href);
+      } finally {
+        setTimeout(() => {
+          openingActivityRef.current = false;
+        }, 800);
+      }
+    },
+    [router, showActivityPopup]
+  );
+
+  const openGameRequestActivityRef = useRef(openGameRequestActivity);
+  openGameRequestActivityRef.current = openGameRequestActivity;
+
+  const openTaskSubmissionActivity = useCallback(
+    async (
+      submission: Pick<TaskSubmission, "id" | "user_id" | "task_id" | "status" | "level">,
+      kind: TaskSubmissionEventDetail["kind"]
+    ) => {
+      const adminView = isAdminRef.current;
+      const path = pathnameRef.current;
+      const task = getTaskById(submission.task_id);
+      const taskTitle = task?.title ?? "Daily task";
+
+      void playMessageNotificationSound();
+
+      const eventDetail: TaskSubmissionEventDetail = { kind, submissionId: submission.id };
+      window.dispatchEvent(
+        new CustomEvent<TaskSubmissionEventDetail>(TASK_SUBMISSION_EVENT, { detail: eventDetail })
+      );
+
+      const href = adminView ? "/admin/tasks" : "/dashboard/tasks";
+      const isNewSubmission = kind === "submitted" || kind === "resubmitted";
+
+      let title = adminView ? "New task submission" : "Task update";
+      let preview = adminView
+        ? `${taskTitle} — Level ${submission.level}`
+        : `"${taskTitle}" was reviewed`;
+
+      if (adminView && isNewSubmission) {
+        const supabase = createClient();
+        if (supabase) {
+          const { data: player } = await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", submission.user_id)
+            .single();
+          const name = player?.full_name || player?.email?.split("@")[0] || "Player";
+          title = name;
+          preview =
+            kind === "resubmitted"
+              ? `Resubmitted: ${taskTitle} (Level ${submission.level})`
+              : `Marked done: ${taskTitle} (Level ${submission.level})`;
+        }
+      }
+
+      if (!adminView && kind === "approved") {
+        title = "Task approved! ⭐";
+        preview = `"${taskTitle}" approved — +${task?.points ?? 0} points`;
+      } else if (!adminView && kind === "rejected") {
+        title = "Task needs revision";
+        preview = `"${taskTitle}" — check your proof and try again`;
+      }
+
+      const popupKind: ActivityPopupKind = isNewSubmission
+        ? "task_submission_new"
+        : "task_submission_review";
+
+      if (isOnTasksPage(path, adminView)) {
+        showActivityPopup({
+          id: submission.id,
+          kind: popupKind,
+          title,
+          preview,
+          href,
+          isAdminView: adminView,
+        });
+        return;
+      }
+
+      if (openingActivityRef.current) return;
+      openingActivityRef.current = true;
+
+      try {
+        showActivityPopup({
+          id: submission.id,
+          kind: popupKind,
+          title,
+          preview,
+          href,
+          isAdminView: adminView,
+        });
+
+        router.push(href);
+      } finally {
+        setTimeout(() => {
+          openingActivityRef.current = false;
+        }, 800);
+      }
+    },
+    [router, showActivityPopup]
+  );
+
+  const openTaskSubmissionActivityRef = useRef(openTaskSubmissionActivity);
+  openTaskSubmissionActivityRef.current = openTaskSubmissionActivity;
+
+  const openDepositActivity = useCallback(
+    async (deposit: {
+      id: string;
+      user_id: string;
+      game_name: string;
+      payment_method: DepositPaymentMethodId;
+      amount: number | null;
+    }) => {
+      const adminView = isAdminRef.current;
+      if (!adminView) return;
+
+      const path = pathnameRef.current;
+      const method = getDepositMethod(deposit.payment_method);
+
+      void playMessageNotificationSound();
+
+      window.dispatchEvent(
+        new CustomEvent<DepositRequestEventDetail>(DEPOSIT_REQUEST_EVENT, {
+          detail: { kind: "new", depositId: deposit.id },
+        })
+      );
+
+      const href = "/admin/deposits?status=pending";
+      let title = "New deposit proof";
+      let preview = `${deposit.game_name} via ${method?.label ?? deposit.payment_method}`;
+
+      const supabase = createClient();
+      if (supabase) {
+        const { data: player } = await supabase
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", deposit.user_id)
+          .single();
+        const name = player?.full_name || player?.email?.split("@")[0] || "Player";
+        title = name;
+        preview = `$${deposit.amount != null && deposit.amount > 0 ? deposit.amount.toFixed(2) : "—"} · ${deposit.game_name} · ${method?.label ?? deposit.payment_method}`;
+      }
+
+      if (isOnDepositsPage(path, true)) {
+        showActivityPopup({
+          id: deposit.id,
+          kind: "deposit_new",
+          title,
+          preview,
+          href,
+          isAdminView: true,
+        });
+        return;
+      }
+
+      if (openingActivityRef.current) return;
+      openingActivityRef.current = true;
+
+      try {
+        showActivityPopup({
+          id: deposit.id,
+          kind: "deposit_new",
+          title,
+          preview,
+          href,
+          isAdminView: true,
+        });
+        router.push(href);
+      } finally {
+        setTimeout(() => {
+          openingActivityRef.current = false;
+        }, 800);
+      }
+    },
+    [router, showActivityPopup]
+  );
+
+  const openDepositActivityRef = useRef(openDepositActivity);
+  openDepositActivityRef.current = openDepositActivity;
 
   const handleIncomingMessage = useCallback(
     (msg: Message) => {
-      playIncomingMessageSound(msg.sender_id, userIdRef.current);
-      void refresh();
-      void showPopup(msg);
+      void openChatForMessage(msg);
     },
-    [refresh, showPopup]
+    [openChatForMessage]
   );
 
+  const handleIncomingMessageRef = useRef(handleIncomingMessage);
+  handleIncomingMessageRef.current = handleIncomingMessage;
+
   useEffect(() => {
-    void syncConversations();
+    const supabase = createClient();
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    const runSync = () => {
+      if (!cancelled) void syncConversations();
+    };
+
+    // Defer first sync so the page paints before network work.
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) runSync();
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) runSync();
+      else {
+        userIdRef.current = null;
+        setConversationIds([]);
+        setCount(0);
+        setIsAdmin(false);
+        setIsLoggedIn(false);
+      }
+    });
 
     const interval = setInterval(() => {
-      void syncConversations();
-    }, 25_000);
+      if (document.visibilityState === "visible" && userIdRef.current) {
+        runSync();
+      }
+    }, 120_000);
 
     function onVisible() {
       if (document.visibilityState === "visible") {
-        void syncConversations();
+        resumeMessageNotificationAudio();
+        if (userIdRef.current) runSync();
       }
     }
 
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      cancelled = true;
+      subscription.unsubscribe();
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
     };
   }, [syncConversations]);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     function unlock() {
       void unlockMessageNotificationSound();
     }
-    window.addEventListener("click", unlock);
-    window.addEventListener("touchstart", unlock, { passive: true });
-    window.addEventListener("keydown", unlock);
+    const gestureOpts: AddEventListenerOptions = { capture: true };
+    document.addEventListener("pointerdown", unlock, gestureOpts);
+    document.addEventListener("touchend", unlock, gestureOpts);
+    document.addEventListener("keydown", unlock);
     return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-      window.removeEventListener("keydown", unlock);
+      document.removeEventListener("pointerdown", unlock, gestureOpts);
+      document.removeEventListener("touchend", unlock, gestureOpts);
+      document.removeEventListener("keydown", unlock);
     };
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
+    // Inbox pages subscribe per-thread — skip duplicate channels here.
+    if (onInboxPage) return;
+
     const supabase = createClient();
-    if (!supabase || !userIdRef.current || conversationIds.length === 0) return;
+    if (!supabase || !userIdRef.current || !isLoggedIn) return;
 
     const userId = userIdRef.current;
-    const channels = conversationIds.map((convId) =>
-      supabase
-        .channel(`msg-rt-${userId}-${convId}-${createClientId()}`)
+    const isAdminUser = isAdminRef.current;
+
+    return subscribeToMessageInserts(
+      supabase,
+      `msg-rt-all-${userId}`,
+      userId,
+      (msg) => handleIncomingMessageRef.current(msg),
+      isAdminUser ? undefined : { conversationIds: conversationIds }
+    );
+  }, [conversationIds, onInboxPage, isLoggedIn, isAdmin]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const supabase = createClient();
+    if (!supabase || !userIdRef.current) return;
+
+    const userId = userIdRef.current;
+    const channels: ReturnType<typeof supabase.channel>[] = [];
+
+    if (isAdmin) {
+      const adminChannel = supabase
+        .channel(`game-req-admin-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "game_requests" },
+          (payload) => {
+            const req = payload.new as GameRequest;
+            if (req.user_id === userId) return;
+            void openGameRequestActivityRef.current(req, "new");
+          }
+        )
+        .subscribe();
+      channels.push(adminChannel);
+    } else {
+      const userChannel = supabase
+        .channel(`game-req-user-${userId}`)
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "UPDATE",
             schema: "public",
-            table: "messages",
-            filter: `conversation_id=eq.${convId}`,
+            table: "game_requests",
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
-            handleIncomingMessage(payload.new as Message);
+            const req = payload.new as GameRequest;
+            const old = payload.old as Partial<GameRequest>;
+            if (!req.status || req.status === old.status) return;
+            if (!["completed", "rejected", "processing"].includes(req.status)) return;
+
+            const kind: GameRequestEventDetail["kind"] =
+              req.status === "completed"
+                ? "completed"
+                : req.status === "rejected"
+                  ? "rejected"
+                  : "updated";
+
+            void openGameRequestActivityRef.current(req, kind);
           }
         )
-        .subscribe()
-    );
+        .subscribe();
+      channels.push(userChannel);
+    }
 
     return () => {
       for (const ch of channels) supabase.removeChannel(ch);
-      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
     };
-  }, [conversationIds, handleIncomingMessage]);
+  }, [isLoggedIn, isAdmin]);
 
-  function openChat() {
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const supabase = createClient();
+    if (!supabase || !userIdRef.current) return;
+
+    const userId = userIdRef.current;
+    const channels: ReturnType<typeof supabase.channel>[] = [];
+
+    if (isAdmin) {
+      const insertChannel = supabase
+        .channel(`task-sub-admin-insert-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "user_task_submissions" },
+          (payload) => {
+            const sub = payload.new as TaskSubmission;
+            if (sub.user_id === userId || sub.status !== "pending") return;
+            void openTaskSubmissionActivityRef.current(sub, "submitted");
+          }
+        )
+        .subscribe();
+
+      const updateChannel = supabase
+        .channel(`task-sub-admin-update-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "user_task_submissions" },
+          (payload) => {
+            const sub = payload.new as TaskSubmission;
+            const old = payload.old as Partial<TaskSubmission>;
+            if (sub.status !== "pending" || old.status === "pending") return;
+            void openTaskSubmissionActivityRef.current(sub, "resubmitted");
+          }
+        )
+        .subscribe();
+
+      channels.push(insertChannel, updateChannel);
+    } else {
+      const userChannel = supabase
+        .channel(`task-sub-user-${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "user_task_submissions",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const sub = payload.new as TaskSubmission;
+            const old = payload.old as Partial<TaskSubmission>;
+            if (!sub.status || sub.status === old.status) return;
+
+            if (sub.status === "approved") {
+              void openTaskSubmissionActivityRef.current(sub, "approved");
+            } else if (sub.status === "rejected") {
+              void openTaskSubmissionActivityRef.current(sub, "rejected");
+            }
+          }
+        )
+        .subscribe();
+
+      channels.push(userChannel);
+    }
+
+    return () => {
+      for (const ch of channels) supabase.removeChannel(ch);
+    };
+  }, [isLoggedIn, isAdmin]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !isAdmin) return;
+
+    const supabase = createClient();
+    if (!supabase || !userIdRef.current) return;
+
+    const userId = userIdRef.current;
+    const channel = supabase
+      .channel(`deposit-admin-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "deposit_requests" },
+        (payload) => {
+          const dep = payload.new as {
+            id: string;
+            user_id: string;
+            game_name: string;
+            payment_method: DepositPaymentMethodId;
+            amount: number | null;
+          };
+          if (dep.user_id === userId) return;
+          void openDepositActivityRef.current(dep);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLoggedIn, isAdmin]);
+
+  function openActivityPopup() {
+    if (!popup) return;
     setPopup(null);
-    router.push(isAdmin ? "/admin/chat" : "/dashboard/messages");
+    router.push(popup.href);
+  }
+
+  function popupIcon(item: ActivityPopup) {
+    if (item.kind === "message") {
+      return item.isAdminView ? (
+        <User className="h-5 w-5 text-white" />
+      ) : (
+        <Headphones className="h-5 w-5 text-white" />
+      );
+    }
+    if (item.kind === "task_submission_new" || item.kind === "task_submission_review") {
+      return <Target className="h-5 w-5 text-white" />;
+    }
+    if (item.kind === "deposit_new") {
+      return <Banknote className="h-5 w-5 text-white" />;
+    }
+    if (item.kind === "game_request_update") {
+      return <CheckCircle className="h-5 w-5 text-white" />;
+    }
+    return <Gamepad2 className="h-5 w-5 text-white" />;
+  }
+
+  function popupActionLabel(item: ActivityPopup) {
+    if (item.kind === "message") return "Tap to open chat";
+    if (item.kind === "deposit_new") return "Tap to review deposit";
+    if (item.kind === "task_submission_new" || item.kind === "task_submission_review") {
+      return item.isAdminView ? "Tap to review task" : "Tap to view tasks";
+    }
+    return "Tap to view request";
   }
 
   const hideFab =
@@ -232,8 +804,14 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
 
   const chatHref = isAdmin ? "/admin/chat" : "/dashboard/messages";
 
+  const contextValue = useMemo(
+    () => ({ count, isAdmin, refresh }),
+    [count, isAdmin, refresh]
+  );
+
   return (
-    <MessageRealtimeContext.Provider value={{ count, isAdmin, refresh }}>
+    <MessageRealtimeContext.Provider value={contextValue}>
+      {isLoggedIn && <SitePresenceHeartbeat />}
       {children}
 
       {!hideFab && isLoggedIn && (
@@ -252,54 +830,47 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         </Link>
       )}
 
-      <AnimatePresence>
-        {popup && (
-          <motion.button
-            type="button"
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            onClick={openChat}
-            className="fixed z-[9998] left-3 right-3 sm:left-auto sm:right-auto sm:w-[320px] bottom-[5.5rem] sm:bottom-6 sm:left-6 flex items-start gap-3 p-3 rounded-2xl border border-white/10 bg-[#1a1a1a]/95 backdrop-blur-md shadow-2xl shadow-black/50 text-left hover:bg-[#222] transition-colors"
-            aria-label="Open chat"
-          >
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
-              {popup.isAdminView ? (
-                <User className="h-5 w-5 text-white" />
-              ) : (
-                <Headphones className="h-5 w-5 text-white" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0 pt-0.5">
-              <p className="text-sm font-semibold text-white truncate">{popup.title}</p>
-              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{popup.preview}</p>
-              <p className="text-[10px] text-orange-400 mt-1.5 font-medium">Tap to open chat</p>
-            </div>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
+      {popup && (
+        <button
+          type="button"
+          onClick={openActivityPopup}
+          className="fixed z-[9998] left-3 right-3 sm:left-auto sm:right-auto sm:w-[320px] bottom-[5.5rem] sm:bottom-6 sm:left-6 flex items-start gap-3 p-3 rounded-2xl border border-white/10 bg-[#1a1a1a] shadow-2xl shadow-black/50 text-left hover:bg-[#222] transition-opacity duration-200 opacity-100"
+          aria-label={
+            popup.kind === "message"
+              ? "Open chat"
+              : popup.kind.startsWith("task_")
+                ? "Open daily tasks"
+                : "Open game request"
+          }
+        >
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center shrink-0">
+            {popupIcon(popup)}
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-sm font-semibold text-white truncate">{popup.title}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{popup.preview}</p>
+            <p className="text-[10px] text-orange-400 mt-1.5 font-medium">{popupActionLabel(popup)}</p>
+          </div>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              setPopup(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
                 e.stopPropagation();
                 setPopup(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  setPopup(null);
-                }
-              }}
-              className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground shrink-0"
-              aria-label="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+              }
+            }}
+            className="p-1 rounded-lg hover:bg-white/10 text-muted-foreground shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </span>
+        </button>
+      )}
     </MessageRealtimeContext.Provider>
   );
-}
-
-export function useUnreadMessages() {
-  return useContext(MessageRealtimeContext);
 }

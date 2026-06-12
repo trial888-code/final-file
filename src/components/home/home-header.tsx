@@ -13,26 +13,31 @@ import { createClient } from "@/lib/supabase/client";
 interface HomeHeaderProps {
   onSearchClick: () => void;
   onMenuClick?: () => void;
+  assumeLoggedIn?: boolean;
 }
 
-export function HomeHeader({ onSearchClick, onMenuClick }: HomeHeaderProps) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+export function HomeHeader({ onSearchClick, onMenuClick, assumeLoggedIn = false }: HomeHeaderProps) {
+  const [isLoggedIn, setIsLoggedIn] = useState(assumeLoggedIn);
   const { count: unreadMessages } = useUnreadMessages();
 
   useEffect(() => {
+    if (assumeLoggedIn) return;
+
     const supabase = createClient();
     if (!supabase) return;
 
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsLoggedIn(!!user);
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session?.user);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session?.user);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [assumeLoggedIn]);
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-3 bg-[#121212]/95 backdrop-blur-md border-b border-white/5 overflow-visible">

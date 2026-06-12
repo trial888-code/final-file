@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { adminGrantWallet, adminDeductWallet, adminResetWallet } from "@/lib/actions/wallet";
+import {
+  adminGrantWallet,
+  adminDeductWallet,
+  adminResetWallet,
+} from "@/lib/actions/wallet";
+import { walletTypeLabel, type WalletType } from "@/lib/wallet/types";
 import { toast } from "sonner";
 
 interface AdminWalletGrantProps {
@@ -13,9 +18,11 @@ interface AdminWalletGrantProps {
 
 export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
   const [amount, setAmount] = useState("5");
-  const [walletType, setWalletType] = useState<"current" | "bonus">("bonus");
+  const [walletType, setWalletType] = useState<WalletType>("bonus");
   const [loading, setLoading] = useState<string | null>(null);
   const router = useRouter();
+
+  const label = walletTypeLabel(walletType);
 
   async function handleGrant() {
     const value = parseFloat(amount);
@@ -26,7 +33,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("grant");
     const result = await adminGrantWallet(userId, value, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`Added $${value} to ${walletType === "bonus" ? "bonus" : "total deposit"}`);
+    else toast.success(`Added $${value} to ${label}`);
     router.refresh();
     setLoading(null);
   }
@@ -40,7 +47,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("deduct");
     const result = await adminDeductWallet(userId, value, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`Removed $${value} from ${walletType === "bonus" ? "bonus" : "total deposit"}`);
+    else toast.success(`Removed $${value} from ${label}`);
     router.refresh();
     setLoading(null);
   }
@@ -49,7 +56,7 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
     setLoading("reset");
     const result = await adminResetWallet(userId, walletType);
     if (result.error) toast.error(result.error);
-    else toast.success(`${walletType === "bonus" ? "Bonus" : "Total Deposit"} reset to $0`);
+    else toast.success(`${label} reset to $0`);
     router.refresh();
     setLoading(null);
   }
@@ -72,11 +79,13 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
           <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Wallet</label>
           <select
             value={walletType}
-            onChange={(e) => setWalletType(e.target.value as "current" | "bonus")}
+            onChange={(e) => setWalletType(e.target.value as WalletType)}
             className="h-8 rounded-md border border-border bg-background px-2 text-sm"
           >
             <option value="bonus">Bonus</option>
             <option value="current">Total Deposit</option>
+            <option value="cashout">Deposit Redeem</option>
+            <option value="bonus_redeem">Bonus Redeem</option>
           </select>
         </div>
         <Button size="sm" variant="outline" onClick={handleGrant} disabled={!!loading}>

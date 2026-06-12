@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -32,9 +33,15 @@ yarn-error.log*
 .env
 .env*.local
 
+# juwa bot debug screenshots
+workers/juwa-bot/debug/
+workers/juwa-bot/chrome-bot-profile/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

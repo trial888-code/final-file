@@ -7,6 +7,7 @@ import { Bell, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { markNotificationsRead } from "@/lib/actions/notifications";
 import { formatRelativeTime, cn, createClientId } from "@/lib/utils";
+import { unlockMessageNotificationSound, playMessageNotificationSound } from "@/lib/chat/message-notification-sound";
 
 interface NotificationItem {
   id: string;
@@ -57,8 +58,9 @@ export function NotificationDropdown({
     if (!supabase) return;
 
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     setIsLoggedIn(!!user);
     setUserId(user?.id ?? null);
     if (!user) return;
@@ -77,11 +79,13 @@ export function NotificationDropdown({
 
   useEffect(() => {
     setMounted(true);
+    const supabase = createClient();
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session?.user);
+      setUserId(session?.user?.id ?? null);
+    });
   }, []);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
 
   useEffect(() => {
     if (!userId) return;
@@ -99,7 +103,8 @@ export function NotificationDropdown({
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        () => {
+        (payload) => {
+          void playMessageNotificationSound();
           fetchNotifications();
         }
       )
@@ -151,6 +156,7 @@ export function NotificationDropdown({
 
   function handleToggle() {
     if (isLoggedIn === false) return;
+    void unlockMessageNotificationSound();
     setOpen((v) => !v);
   }
 

@@ -91,34 +91,57 @@ function ensureHtmlAudio(): HTMLAudioElement | null {
     htmlAudio = new Audio(htmlAudioUrl);
     htmlAudio.preload = "auto";
     htmlAudio.volume = 0.85;
+    // Required for iOS — without this, notification audio is blocked in mobile Safari.
+    htmlAudio.setAttribute("playsinline", "true");
+    htmlAudio.setAttribute("webkit-playsinline", "true");
+    htmlAudio.load();
   }
 
   return htmlAudio;
 }
 
-/** Unlock audio — must run after user taps/clicks (once per session minimum) */
-export async function unlockMessageNotificationSound(): Promise<void> {
-  if (unlocked) return;
+/**
+ * Unlock audio after a user gesture.
+ * play() and resume() must start synchronously inside the gesture handler — iOS Safari
+ * revokes user activation before awaited work runs.
+ */
+export function unlockMessageNotificationSound(): Promise<void> {
+  if (unlocked) return Promise.resolve();
 
   ensureHtmlAudio();
 
   const ctx = getAudioContext();
-  try {
-    if (ctx && ctx.state === "suspended") {
-      await ctx.resume();
-    }
+  if (ctx?.state === "suspended") {
+    void ctx.resume();
+  }
 
-    const audio = ensureHtmlAudio();
-    if (audio) {
-      audio.currentTime = 0;
-      await audio.play();
+  const audio = ensureHtmlAudio();
+  if (!audio) return Promise.resolve();
+
+  audio.currentTime = 0;
+  const playPromise = audio.play();
+
+  if (!playPromise) {
+    unlocked = true;
+    return Promise.resolve();
+  }
+
+  return playPromise
+    .then(() => {
       audio.pause();
       audio.currentTime = 0;
-    }
+      unlocked = true;
+    })
+    .catch(() => {
+      // Allow retry on the next tap — gesture may have expired or silent-mode blocked once.
+    });
+}
 
-    unlocked = true;
-  } catch {
-    // still allow retry on next gesture
+/** Re-resume audio after returning to the tab (mobile browsers suspend contexts in background). */
+export function resumeMessageNotificationAudio(): void {
+  const ctx = getAudioContext();
+  if (ctx?.state === "suspended") {
+    void ctx.resume();
   }
 }
 
@@ -180,13 +203,10 @@ export async function playMessageNotificationSound(): Promise<boolean> {
   const now = Date.now();
   if (now - lastPlayedAt < MIN_INTERVAL_MS) return false;
 
-  let played = false;
+  resumeMessageNotificationAudio();
 
-  if (unlocked) {
-    played = (await playWithHtmlAudio()) || (await playWithWebAudio());
-  } else {
-    played = await playWithWebAudio();
-  }
+  // HTML5 audio is more reliable on mobile once unlocked; Web Audio is the desktop fallback.
+  let played = (await playWithHtmlAudio()) || (await playWithWebAudio());
 
   if (played) {
     lastPlayedAt = now;

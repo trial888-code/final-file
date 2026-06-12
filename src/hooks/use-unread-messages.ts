@@ -1,1 +1,1 @@
-export { useUnreadMessages, MessageRealtimeProvider } from "@/components/chat/message-realtime-provider";
+export { useUnreadMessages } from "@/lib/chat/message-realtime-context";

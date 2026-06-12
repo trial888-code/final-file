@@ -18,6 +18,8 @@ import {
   Users,
   Headphones,
   ShieldCheck,
+  StarHalf,
+  Target,
 } from "lucide-react";
 import type { GameTab } from "@/lib/games";
 import { cn } from "@/lib/utils";
@@ -38,6 +40,8 @@ const ACCOUNT_LINKS = [
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
+  { href: "/dashboard/reviews", label: "Reviews", icon: StarHalf },
+  { href: "/dashboard/tasks", label: "Daily Tasks", icon: Target },
   { href: "/spin", label: "Daily Spin", icon: Sparkles },
 ];
 

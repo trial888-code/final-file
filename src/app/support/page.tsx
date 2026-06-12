@@ -36,7 +36,7 @@ export default function SupportPage() {
           <div className="grid sm:grid-cols-3 gap-6 mb-16">
             {[
               { icon: MessageCircle, title: "Live Chat", desc: "Chat with our support team in real-time", action: "Open Chat", href: "/login" },
-              { icon: Mail, title: "Email Support", desc: "support@spinora.com", action: "Send Email", href: "mailto:support@spinora.com" },
+              { icon: Mail, title: "Email Support", desc: "support@spinoracasinos.com", action: "Send Email", href: "mailto:support@spinoracasinos.com" },
               { icon: Clock, title: "Response Time", desc: "Average response under 5 minutes", action: "Learn More", href: "/about" },
             ].map((item) => {
               const Icon = item.icon;
