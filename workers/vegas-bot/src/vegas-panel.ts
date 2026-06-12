@@ -231,15 +231,20 @@ export async function redeemAccount(
 
 /* ------------------------------------------------------- account creation */
 
-async function hasDuplicateError(page: Page): Promise<boolean> {
+async function readPanelMessages(page: Page): Promise<string> {
   const messages = await page
     .locator(".el-message, .el-form-item__error")
     .allInnerTexts()
     .catch(() => [] as string[]);
-  return /exist|already|taken|duplicate|repeat|重复|已存在/i.test(messages.join(" "));
+  return messages.join(" ").replace(/\s+/g, " ").trim();
 }
 
-async function tryCreateOnce(page: Page, username: string, password: string): Promise<boolean> {
+type CreateOutcome =
+  | { status: "created" }
+  | { status: "duplicate" }
+  | { status: "error"; message: string };
+
+async function tryCreateOnce(page: Page, username: string, password: string): Promise<CreateOutcome> {
   await gotoUserList(page);
   await page.getByRole("button", { name: /new account/i }).first().click();
   await page.waitForTimeout(1000);
@@ -250,32 +255,26 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   const textInputs = dlg.locator('input.el-input__inner:not([type="password"])');
   const passInputs = dlg.locator('input[type="password"]');
 
-  await typeInto(textInputs.nth(0), username); // Account
-  if ((await textInputs.count()) > 1) await typeInto(textInputs.nth(1), username); // Nickname
+  await typeInto(textInputs.nth(0), username); // Account (Nickname defaults to account; leave blank)
   await typeInto(passInputs.nth(0), password); // Login password
   await typeInto(passInputs.nth(1), password); // Confirm password
 
   await clickDialogButton(dlg, /^\s*save\s*$/i);
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(1500);
 
-  if (await hasDuplicateError(page)) {
+  // Read any toast/validation message BEFORE it disappears or we navigate away.
+  const messages = await readPanelMessages(page);
+  if (/exist|already|taken|duplicate|repeat|重复|已存在/i.test(messages)) {
     log("create", `username ${username} already exists`);
     await closeOverlays(page);
-    return false;
+    return { status: "duplicate" };
   }
 
-  // Success when the dialog closed.
-  if (await dlg.isVisible().catch(() => false)) {
-    await screenshot(page, "create-still-open");
-    if (await hasDuplicateError(page)) {
-      await closeOverlays(page);
-      return false;
-    }
-    // Unknown error — close and let the caller retry/fail.
-    await closeOverlays(page);
-    return false;
-  }
-  return true;
+  // Ground truth: did the account actually get created? (also closes overlays)
+  const exists = await accountExists(page, username);
+  if (exists) return { status: "created" };
+
+  return { status: "error", message: messages || "account was not created (unknown panel error)" };
 }
 
 export async function createAccount(
@@ -284,19 +283,29 @@ export async function createAccount(
   password: string,
   variant: (base: string, attempt: number) => string
 ): Promise<{ username: string; password: string }> {
-  // Skip names that already exist before attempting to create.
-  for (let attempt = 0; attempt < 15; attempt++) {
+  for (let attempt = 0; attempt < 12; attempt++) {
     const username = variant(baseUsername, attempt);
+
+    // Skip names already taken before attempting to create.
     if (await accountExists(page, username)) {
       log("create", `"${username}" already exists — trying next variant`);
       continue;
     }
-    const ok = await tryCreateOnce(page, username, password);
-    if (ok) {
+
+    const outcome = await tryCreateOnce(page, username, password);
+    if (outcome.status === "created") {
       log("create", `created ${username}`);
       return { username, password };
     }
+    if (outcome.status === "duplicate") {
+      continue; // name got taken in a race — try the next variant
+    }
+
+    // A real error (e.g. validation) — stop so we don't create junk accounts.
+    await screenshot(page, "create-error");
+    throw new Error(`Vegas account creation failed: ${outcome.message}`);
   }
+
   await screenshot(page, "create-exhausted");
   throw new Error(`Could not create a unique account from base "${baseUsername}"`);
 }
