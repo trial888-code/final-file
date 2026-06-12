@@ -52,9 +52,17 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
   const canClaim = levelStat?.status === "completed" && !levelStat?.reward_granted;
   const unlockInfo = getLevelUnlockInfo(selectedLevel, board.levelProgress);
 
-  async function handleClaim() {
+  // Lowest level whose tasks are all approved but the reward isn't claimed yet.
+  const claimableLevel = [...board.levelProgress]
+    .sort((a, b) => a.level - b.level)
+    .find((p) => p.status === "completed" && !p.reward_granted);
+  const claimableMeta = claimableLevel
+    ? TASK_LEVELS.find((l) => l.level === claimableLevel.level)
+    : undefined;
+
+  async function handleClaim(level: number) {
     setClaiming(true);
-    const result = await claimLevelReward(selectedLevel);
+    const result = await claimLevelReward(level);
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -75,6 +83,31 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
         </p>
         <p className="text-sm text-muted-foreground">Total Cash Earned</p>
         <p className="text-xs text-amber-400 mt-2">{board.totalPointsEarned} total points earned</p>
+
+        {claimableLevel && claimableMeta && (
+          <div className="relative mt-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-center sm:text-left">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
+                <Gift className="h-5 w-5" />
+                <span>
+                  Level {claimableLevel.level} complete — claim your ${claimableMeta.cashReward} reward!
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleClaim(claimableLevel.level)}
+                disabled={claiming}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-400 px-5 py-2.5 text-sm font-bold text-black shadow-lg shadow-emerald-500/20 disabled:opacity-60"
+              >
+                {claiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+                Claim Reward
+              </button>
+            </div>
+            <p className="text-[11px] text-emerald-300/70 mt-2">
+              Goes to your Bonus wallet. Next level unlocks 24h after you claim.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-6 border-b border-white/10 mb-6 overflow-x-auto scrollbar-hide">
@@ -164,7 +197,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={handleClaim}
+                      onClick={() => handleClaim(selectedLevel)}
                       disabled={claiming}
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-400 px-4 py-2 text-sm font-bold text-black disabled:opacity-60"
                     >
