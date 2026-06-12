@@ -239,6 +239,19 @@ async function readPanelMessages(page: Page): Promise<string> {
   return messages.join(" ").replace(/\s+/g, " ").trim();
 }
 
+/** Panel rejects taken names with messages like "login name have used". */
+const DUPLICATE_RE = /exist|already|taken|duplicate|repeat|in ?use|have used|used|重复|已存在/i;
+
+/** The create dialog stays open on error and closes on success. */
+function createDialogOpen(page: Page): Promise<boolean> {
+  return page
+    .locator(".el-overlay:not([style*='display: none']) .el-dialog")
+    .filter({ hasText: /Essential information/i })
+    .last()
+    .isVisible()
+    .catch(() => false);
+}
+
 type CreateOutcome =
   | { status: "created" }
   | { status: "duplicate" }
@@ -262,19 +275,28 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   await clickDialogButton(dlg, /^\s*save\s*$/i);
   await page.waitForTimeout(1500);
 
-  // Read any toast/validation message BEFORE it disappears or we navigate away.
+  // Read any toast/validation message BEFORE it disappears.
   const messages = await readPanelMessages(page);
-  if (/exist|already|taken|duplicate|repeat|重复|已存在/i.test(messages)) {
-    log("create", `username ${username} already exists`);
-    await closeOverlays(page);
-    return { status: "duplicate" };
+
+  // Success signal: the "Essential information" dialog closes only on success.
+  let stillOpen = await createDialogOpen(page);
+  if (stillOpen && !DUPLICATE_RE.test(messages)) {
+    await page.waitForTimeout(1200); // give a slow success a moment to close
+    stillOpen = await createDialogOpen(page);
   }
 
-  // Ground truth: did the account actually get created? (also closes overlays)
-  const exists = await accountExists(page, username);
-  if (exists) return { status: "created" };
+  if (!stillOpen) {
+    await closeOverlays(page); // dismiss any post-create confirmation popup
+    return { status: "created" };
+  }
 
-  return { status: "error", message: messages || "account was not created (unknown panel error)" };
+  // Dialog still open → not created.
+  await closeOverlays(page);
+  if (DUPLICATE_RE.test(messages)) {
+    log("create", `username ${username} already exists (${messages})`);
+    return { status: "duplicate" };
+  }
+  return { status: "error", message: messages || "create dialog stayed open (unknown panel error)" };
 }
 
 export async function createAccount(
@@ -283,7 +305,7 @@ export async function createAccount(
   password: string,
   variant: (base: string, attempt: number) => string
 ): Promise<{ username: string; password: string }> {
-  for (let attempt = 0; attempt < 12; attempt++) {
+  for (let attempt = 0; attempt < 20; attempt++) {
     const username = variant(baseUsername, attempt);
 
     // Skip names already taken before attempting to create.
