@@ -143,13 +143,26 @@ function redeemDialog(page: Page) {
   return page.locator(".el-dialog").filter({ hasText: /redeem/i }).last();
 }
 
-async function findUserRow(page: Page, username: string) {
+async function searchForUser(page: Page, username: string) {
   const search = page.getByPlaceholder(/search account|search content|please enter/i).first();
   await search.waitFor({ state: "visible", timeout: 10000 });
   await search.click();
   await search.fill("");
   await search.fill(username);
   await clickSearch(page);
+  // give the table time to re-render the filtered result
+  await page.waitForTimeout(1500);
+}
+
+async function findUserRow(page: Page, username: string) {
+  await searchForUser(page, username);
+
+  // Prefer the main (non-fixed) table body so cell indices line up with headers.
+  const scoped = page
+    .locator(".el-table__body-wrapper tbody tr")
+    .filter({ hasText: username })
+    .first();
+  if (await scoped.isVisible().catch(() => false)) return scoped;
 
   const row = page.locator("tbody tr, .el-table__row").filter({ hasText: username }).first();
   if (!(await row.isVisible().catch(() => false))) {
@@ -184,6 +197,7 @@ export async function userExists(page: Page, username: string): Promise<boolean>
   return false;
 }
 
+/** Strict: whole cell must be a money value (avoids grabbing IDs/phones/dates). */
 function parseMoney(text: string): number | null {
   const cleaned = text.replace(/,/g, "").trim();
   const match = cleaned.match(/^\$?\s*(\d+(?:\.\d{1,2})?)$/);
@@ -192,31 +206,86 @@ function parseMoney(text: string): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-export async function readUserGameBalance(page: Page, username: string): Promise<number> {
-  await goToUserManagement(page);
-  await closeOpenDialogs(page);
-  const row = await findUserRow(page, username);
+/** Lenient: extract the first number from a cell (used once we know it's the balance column). */
+function extractMoney(text: string): number | null {
+  const cleaned = text.replace(/,/g, "");
+  const match = cleaned.match(/\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const value = Number(match[0]);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Find which column holds the balance by reading the table headers. */
+async function getBalanceColumnIndex(page: Page): Promise<number> {
+  const pattern = /score|balance|coin|credit|wallet|amount|余额|金币|分数|积分/i;
+  const scopes = [
+    ".el-table__header-wrapper .el-table__header th",
+    ".el-table__header th",
+    "thead th",
+  ];
+  for (const scope of scopes) {
+    const ths = page.locator(scope);
+    const count = await ths.count();
+    if (count === 0) continue;
+    for (let i = 0; i < count; i++) {
+      const text = (await ths.nth(i).innerText().catch(() => "")).trim();
+      if (pattern.test(text)) {
+        log("balance-col", `"${text}" at index ${i}`);
+        return i;
+      }
+    }
+    return -1; // header found but no balance-like column
+  }
+  return -1;
+}
+
+/**
+ * Read the user's score/balance from their table row. Prefers the column that
+ * the header identifies as the balance; falls back to scanning money-like cells.
+ */
+async function readBalanceFromRow(
+  page: Page,
+  row: Locator,
+  username: string,
+  allowZero: boolean
+): Promise<number> {
+  const idx = await getBalanceColumnIndex(page);
+  const tds = row.locator("td");
+  const tdCount = await tds.count();
+
+  if (idx >= 0 && idx < tdCount) {
+    const text = (await tds.nth(idx).innerText().catch(() => "")).trim();
+    const value = extractMoney(text);
+    if (value !== null && (allowZero || value > 0)) {
+      log("balance", `${username} = ${value} (column ${idx}, raw "${text}")`);
+      return value;
+    }
+  }
+
+  // Fallback: scan strict money cells in the row.
   const cells = row.locator("td, .cell");
   const count = await cells.count();
-
+  const values: number[] = [];
   for (let i = 0; i < count; i++) {
     const text = (await cells.nth(i).innerText()).trim();
     if (text.includes(username)) continue;
     const value = parseMoney(text);
-    if (value !== null && value > 0) return value;
+    if (value !== null && (allowZero || value > 0)) values.push(value);
   }
+  log("balance", `${username} fallback cells = [${values.join(", ")}]`);
+  if (values.length > 0) return Math.max(...values);
+  return allowZero ? 0 : Number.NaN;
+}
 
-  const rowText = await row.innerText();
-  const amounts = rowText
-    .split(/\s+/)
-    .map((part) => parseMoney(part))
-    .filter((v): v is number => v !== null && v > 0);
-
-  if (amounts.length === 0) {
+export async function readUserGameBalance(page: Page, username: string): Promise<number> {
+  await goToUserManagement(page);
+  await closeOpenDialogs(page);
+  const row = await findUserRow(page, username);
+  const value = await readBalanceFromRow(page, row, username, false);
+  if (!Number.isFinite(value)) {
     throw new Error(`Could not read balance for "${username}"`);
   }
-
-  return Math.max(...amounts);
+  return value;
 }
 
 /**
@@ -228,27 +297,7 @@ export async function readUserGameBalanceForCheck(page: Page, username: string):
   await goToUserManagement(page);
   await closeOpenDialogs(page);
   const row = await findUserRow(page, username);
-
-  const cells = row.locator("td, .cell");
-  const count = await cells.count();
-  const values: number[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const text = (await cells.nth(i).innerText()).trim();
-    if (text.includes(username)) continue;
-    const value = parseMoney(text);
-    if (value !== null) values.push(value);
-  }
-
-  if (values.length === 0) {
-    const rowText = await row.innerText();
-    for (const part of rowText.split(/\s+/)) {
-      const value = parseMoney(part);
-      if (value !== null) values.push(value);
-    }
-  }
-
-  return values.length ? Math.max(...values) : 0;
+  return readBalanceFromRow(page, row, username, true);
 }
 
 async function openRedeemDialog(page: Page, username: string) {
