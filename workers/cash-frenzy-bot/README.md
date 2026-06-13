@@ -1,9 +1,9 @@
 # Spinora Cash Frenzy Bot
 
 Automates the **Cash Frenzy** agent panel (`agentserver.cashfrenzy777.com`) for account
-creation, recharge (load), redeem, and balance checks. Same "Backend" panel
-software as the Vegas Sweeps bot, so the logic is shared. It polls the same
-Supabase queue but only claims jobs for the `cash-frenzy` game.
+creation, recharge (load), redeem, and balance checks. Same **layui MDI** backend as
+Gameroom / Cash Machine — stay on `/admin`, open **Game User → User Management**, then
+work inside the player list iframe. It polls the Supabase queue for `cash-frenzy` jobs.
 
 ## Setup
 
@@ -25,12 +25,13 @@ Fill `.env`:
 ```bat
 start-chrome-for-bot.bat        REM opens Chrome on port 9229
 REM log in to the panel manually (type the captcha)
+REM open Game User → User Management on /admin
 REM set CASHFRENZY_CDP_URL=http://127.0.0.1:9229 in .env
 start-bot.bat
 ```
 
 If the Chrome session expires, re-run `start-chrome-for-bot.bat`, log in again,
-then restart `start-bot.bat`.
+open User Management, then restart `start-bot.bat`.
 
 ## Verifying selectors (optional)
 

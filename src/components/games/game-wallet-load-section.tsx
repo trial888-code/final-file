@@ -36,7 +36,7 @@ interface GameWalletLoadSectionProps {
 }
 
 /** Layui agent panels (Gameroom family) — stricter username/password rules. */
-const LAYUI_PANEL_SLUGS = ["gameroom", "cash-machine", "mr-all-in-one", "mafia"] as const;
+const LAYUI_PANEL_SLUGS = ["gameroom", "cash-machine", "mr-all-in-one", "mafia", "cash-frenzy"] as const;
 
 function isLayuiPanelGame(slug: string): boolean {
   return (LAYUI_PANEL_SLUGS as readonly string[]).includes(slug);

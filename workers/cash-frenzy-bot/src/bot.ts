@@ -1,5 +1,5 @@
 import type { GameLoadJob, BotResult } from "./types.js";
-import { buildCredentials, usernameVariant } from "./credentials.js";
+import { buildCredentials, usernameVariant, normalizeUsername, passwordForAccount } from "./credentials.js";
 import { openBrowserSession, vpnHint } from "./browser.js";
 import {
   loginToPanel,
@@ -11,11 +11,11 @@ import {
 import { log, screenshot } from "./panel-utils.js";
 
 function credentialsForJob(job: GameLoadJob): { username: string; password: string } {
-  // User picked their own login → honour it (uniqueness handled separately).
   const customUser = job.game_username?.trim();
   if (customUser) {
-    const password = job.game_password?.trim() || customUser;
-    return { username: customUser.slice(0, 13), password };
+    const username = normalizeUsername(customUser);
+    const password = passwordForAccount(username, job.game_password?.trim() || undefined);
+    return { username, password };
   }
   return buildCredentials({
     full_name: job.requester_name,
@@ -34,7 +34,7 @@ export async function runJob(job: GameLoadJob): Promise<BotResult> {
       const requested = credentialsForJob(job);
       log(
         "create-user",
-        `${requested.username} (requester: ${job.requester_name ?? job.requester_email ?? job.user_id})`
+        `${requested.username} (pw len ${requested.password.length}, requester: ${job.requester_name ?? job.requester_email ?? job.user_id})`
       );
       const creds = await createAccount(
         page,
