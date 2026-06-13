@@ -1,5 +1,5 @@
 import type { GameLoadJob, BotResult } from "./types.js";
-import { buildCredentials, usernameVariant } from "./credentials.js";
+import { buildCredentials, usernameVariant, normalizeUsername, cleanPassword } from "./credentials.js";
 import { openBrowserSession, vpnHint } from "./browser.js";
 import {
   loginToPanel,
@@ -13,8 +13,9 @@ import { log, screenshot } from "./panel-utils.js";
 function credentialsForJob(job: GameLoadJob): { username: string; password: string } {
   const customUser = job.game_username?.trim();
   if (customUser) {
-    const password = job.game_password?.trim() || customUser;
-    return { username: customUser.slice(0, 13), password };
+    const username = normalizeUsername(customUser);
+    const password = cleanPassword(job.game_password?.trim() || username, username);
+    return { username, password };
   }
   return buildCredentials({
     full_name: job.requester_name,

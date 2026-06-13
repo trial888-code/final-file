@@ -277,56 +277,97 @@ async function createDialogStillOpen(page: Page): Promise<boolean> {
 }
 
 async function fillAndSaveCreateDialog(page: Page, username: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  const fillScript = ({ user, pass }: { user: string; pass: string }) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    const setVal = (el: HTMLInputElement, val: string) => {
+      el.setAttribute("autocomplete", "off");
+      setter?.call(el, val);
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: val, inputType: "insertText" }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
+    };
+
+    const norm = (s: string) => s.replace(/\s+/g, " ").replace(/\*/g, "").trim();
+
+    const findDialog = (): Element | undefined => {
+      for (const overlay of document.querySelectorAll(".el-overlay")) {
+        if (overlay.getAttribute("style")?.includes("display: none")) continue;
+        const candidate = overlay.querySelector(".el-dialog");
+        if (candidate?.querySelector('input[type="password"]')) return candidate;
+      }
+      return [...document.querySelectorAll(".el-dialog")].find((d) => d.querySelector('input[type="password"]'));
+    };
+
+    const inputByLabel = (dlg: Element, pattern: RegExp): HTMLInputElement | null => {
+      for (const item of dlg.querySelectorAll(".el-form-item")) {
+        const label = norm(item.querySelector(".el-form-item__label")?.textContent ?? "");
+        if (!pattern.test(label)) continue;
+        const input = item.querySelector("input") as HTMLInputElement | null;
+        if (input) return input;
+      }
+      return null;
+    };
+
+    const dlg = findDialog();
+    if (!dlg) return { ok: false, error: "create dialog not found" };
+
+    let accountInput = inputByLabel(dlg, /^account/i);
+    let loginPass = inputByLabel(dlg, /login\s*password/i);
+    let confirmPass = inputByLabel(dlg, /confirm\s*password/i);
+
+    const passInputs = [...dlg.querySelectorAll('input[type="password"]')] as HTMLInputElement[];
+    if (!loginPass && passInputs.length >= 1) loginPass = passInputs[0];
+    if (!confirmPass && passInputs.length >= 2) confirmPass = passInputs[1];
+
+    if (!accountInput) {
+      const textInputs = [
+        ...dlg.querySelectorAll(
+          'input.el-input__inner:not([type="password"]), input:not([type="password"]):not([type="hidden"])'
+        ),
+      ].filter((el) => (el as HTMLInputElement).type !== "checkbox") as HTMLInputElement[];
+      accountInput = textInputs[0] ?? null;
+    }
+
+    if (!accountInput || !loginPass || !confirmPass) {
+      return {
+        ok: false,
+        error: `create form fields missing (account=${Boolean(accountInput)}, login=${Boolean(loginPass)}, confirm=${Boolean(confirmPass)})`,
+      };
+    }
+
+    // Clear browser autofill (agent creds) then fill player account from Spinora job.
+    for (const el of [accountInput, loginPass, confirmPass]) {
+      setVal(el, "");
+    }
+    setVal(accountInput, user);
+    setVal(loginPass, pass);
+    setVal(confirmPass, pass);
+
+    // Second pass if autofill or Vue overwrote values.
+    if (accountInput.value !== user || loginPass.value !== pass || confirmPass.value !== pass) {
+      for (const el of [accountInput, loginPass, confirmPass]) setVal(el, "");
+      setVal(accountInput, user);
+      setVal(loginPass, pass);
+      setVal(confirmPass, pass);
+    }
+
+    if (accountInput.value !== user || loginPass.value !== pass || confirmPass.value !== pass) {
+      return {
+        ok: false,
+        error: `form values mismatch (account="${accountInput.value}", passLen=${loginPass.value.length}, confirmLen=${confirmPass.value.length})`,
+      };
+    }
+
+    const saveBtn = [...dlg.querySelectorAll("button, .el-button")].find((b) =>
+      /^\s*save\s*$/i.test((b.textContent ?? "").trim())
+    );
+    if (!saveBtn) return { ok: false, error: "Save button not found" };
+    (saveBtn as HTMLElement).click();
+    return { ok: true };
+  };
+
   for (const frame of page.frames()) {
-    const result = await frame
-      .evaluate(
-        ({ user, pass }) => {
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-          const setVal = (el: HTMLInputElement, val: string) => {
-            setter?.call(el, val);
-            el.dispatchEvent(new InputEvent("input", { bubbles: true, data: val, inputType: "insertText" }));
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-          };
-
-          let dlg: Element | undefined;
-          for (const overlay of document.querySelectorAll(".el-overlay")) {
-            if (overlay.getAttribute("style")?.includes("display: none")) continue;
-            const candidate = overlay.querySelector(".el-dialog");
-            if (candidate?.querySelector('input[type="password"]')) {
-              dlg = candidate;
-              break;
-            }
-          }
-          if (!dlg) {
-            dlg = [...document.querySelectorAll(".el-dialog")].find((d) => d.querySelector('input[type="password"]'));
-          }
-          if (!dlg) return { ok: false, error: "create dialog not found" };
-
-          const textInputs = [
-            ...dlg.querySelectorAll(
-              'input.el-input__inner:not([type="password"]), input:not([type="password"]):not([type="hidden"])'
-            ),
-          ].filter((el) => (el as HTMLInputElement).type !== "checkbox") as HTMLInputElement[];
-          const passInputs = [...dlg.querySelectorAll('input[type="password"]')] as HTMLInputElement[];
-
-          if (textInputs.length < 1 || passInputs.length < 2) {
-            return { ok: false, error: `create form inputs missing (text=${textInputs.length}, pass=${passInputs.length})` };
-          }
-
-          setVal(textInputs[0], user);
-          setVal(passInputs[0], pass);
-          setVal(passInputs[1], pass);
-
-          const saveBtn = [...dlg.querySelectorAll("button, .el-button")].find((b) =>
-            /^\s*save\s*$/i.test(b.textContent ?? "")
-          );
-          if (!saveBtn) return { ok: false, error: "Save button not found" };
-          (saveBtn as HTMLElement).click();
-          return { ok: true };
-        },
-        { user: username, pass: password }
-      )
-      .catch(() => null);
+    const result = await frame.evaluate(fillScript, { user: username, pass: password }).catch(() => null);
     if (result?.ok) return result;
     if (result && !result.ok && result.error !== "create dialog not found") return result;
   }
@@ -538,12 +579,14 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
     return { status: "error", message: "Create dialog did not open after New Account click" };
   }
 
+  await page.waitForTimeout(800);
+
   const filled = await fillAndSaveCreateDialog(page, username, password);
   if (!filled.ok) {
     await screenshot(page, "create-fill-failed");
     return { status: "error", message: filled.error ?? "Could not fill create form" };
   }
-  log("create", "submitted Save");
+  log("create", `filled Account=${username}, password+confirm, clicked Save`);
 
   await page.waitForTimeout(2500);
   const messages = await readDomMessages(page);

@@ -1,8 +1,23 @@
 /**
- * Cash Frenzy account names: letters/numbers/underscore, 13 chars or fewer
- * (panel rule). Password defaults to the username unless the user picked one.
+ * Cash Frenzy account names: letters/numbers, 20 chars or fewer (panel rule).
+ * Password defaults to the username unless the user picked one.
  */
-const MAX_LEN = 13;
+const MAX_LEN = 20;
+
+function cleanAccount(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, MAX_LEN);
+}
+
+/** Panel accepts letters and numbers only in passwords. */
+export function cleanPassword(raw: string, fallback: string): string {
+  const p = raw.replace(/[^a-zA-Z0-9]/g, "").slice(0, MAX_LEN);
+  if (p.length >= 6) return p;
+  return cleanAccount(fallback) || "player1";
+}
+
+export function normalizeUsername(raw: string): string {
+  return cleanAccount(raw);
+}
 export function buildCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
@@ -30,8 +45,8 @@ export function buildCredentials(profile: {
 
   if (!base) base = "player";
 
-  const username = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN);
-  return { username, password: username };
+  const username = cleanAccount(base || "player");
+  return { username, password: cleanPassword(username, username) };
 }
 
 function randomSuffix(len: number): string {
@@ -42,7 +57,7 @@ function randomSuffix(len: number): string {
 }
 
 export function usernameVariant(base: string, attempt: number): string {
-  const clean = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN) || "player";
+  const clean = cleanAccount(base) || "player";
   if (attempt <= 0) return clean;
 
   let suffix: string;
