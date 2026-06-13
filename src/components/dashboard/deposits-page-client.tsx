@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DepositProofImage } from "@/components/deposits/deposit-proof-image";
@@ -95,7 +96,10 @@ export function DepositsPageClient() {
         ) : (
           <Card>
             <CardContent className="p-8 text-center text-muted-foreground">
-              No deposits yet. Submit a proof from any game page.
+              No deposits yet.{" "}
+              <Link href="/dashboard/deposit" className="text-orange-400 hover:underline">
+                Make a deposit
+              </Link>
             </CardContent>
           </Card>
         )}

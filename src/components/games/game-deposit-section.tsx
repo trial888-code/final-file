@@ -25,9 +25,11 @@ import { toast } from "sonner";
 
 interface GameDepositSectionProps {
   game: Game;
+  /** Hide scroll anchor when rendered on /dashboard/deposit */
+  hideSectionAnchor?: boolean;
 }
 
-export function GameDepositSection({ game }: GameDepositSectionProps) {
+export function GameDepositSection({ game, hideSectionAnchor }: GameDepositSectionProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,7 @@ export function GameDepositSection({ game }: GameDepositSectionProps) {
 
   return (
     <section
-      id="deposit"
+      id={hideSectionAnchor ? undefined : "deposit"}
       className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5 scroll-mt-24"
     >
       <div className="flex items-center gap-2 mb-4">

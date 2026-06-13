@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 const DASHBOARD_ROUTES = [
   "/dashboard",
+  "/dashboard/deposit",
+  "/dashboard/deposits",
   "/dashboard/messages",
   "/dashboard/vip",
   "/dashboard/referrals",

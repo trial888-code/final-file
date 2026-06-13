@@ -12,6 +12,8 @@ import {
   Sparkles,
   Headphones,
   ShieldCheck,
+  Gamepad2,
+  Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
@@ -20,6 +22,8 @@ import { usePrefetchDashboardRoutes } from "@/lib/dashboard/prefetch-dashboard-r
 
 const ACCOUNT_LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/#games", label: "Games", icon: Gamepad2, gamesLink: true },
+  { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
@@ -53,10 +57,12 @@ export function AccountSidebar({ walletSlot, className }: AccountSidebarProps) {
           My Account
         </p>
         <nav className="space-y-1">
-          {ACCOUNT_LINKS.map(({ href, label, icon: Icon, exact }) => {
-            const active = exact
-              ? pathname === href
-              : pathname === href || pathname.startsWith(`${href}/`);
+          {ACCOUNT_LINKS.map(({ href, label, icon: Icon, exact, gamesLink }) => {
+            const active = gamesLink
+              ? pathname === "/" || pathname.startsWith("/games")
+              : exact
+                ? pathname === href
+                : pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}

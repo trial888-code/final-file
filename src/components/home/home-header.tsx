@@ -77,7 +77,7 @@ export function HomeHeader({ onSearchClick, onMenuClick, assumeLoggedIn = false 
         {isLoggedIn ? (
           <>
             <Link
-              href="/support"
+              href="/dashboard/deposit"
               className="inline-flex px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-gray-900 text-[10px] sm:text-sm font-bold hover:opacity-90 transition-opacity shrink-0 whitespace-nowrap"
             >
               Deposit

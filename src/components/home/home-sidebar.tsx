@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   StarHalf,
   Target,
+  Gamepad2,
+  Banknote,
 } from "lucide-react";
 import type { GameTab } from "@/lib/games";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,8 @@ const SIDEBAR_LINKS: { id: GameTab; label: string; icon: React.ElementType }[] =
 
 const ACCOUNT_LINKS = [
   { href: "/", label: "Home", icon: LayoutDashboard },
+  { href: "/#games", label: "Games", icon: Gamepad2, gamesLink: true },
+  { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
@@ -124,8 +128,10 @@ export function HomeSidebar({
             My Account
           </p>
           <nav className="space-y-1">
-            {ACCOUNT_LINKS.map(({ href, label, icon: Icon }) => {
-              const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+            {ACCOUNT_LINKS.map(({ href, label, icon: Icon, gamesLink }) => {
+              const active = gamesLink
+                ? pathname === "/" || pathname.startsWith("/games")
+                : pathname === href || (href !== "/" && pathname.startsWith(href));
               return (
                 <Link
                   key={href}

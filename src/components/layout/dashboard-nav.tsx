@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   X,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedLogo, AnimatedLogoText } from "@/components/ui/animated-logo";
@@ -30,7 +31,9 @@ import { UnreadBadge } from "@/components/ui/unread-badge";
 
 const userLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/deposits", label: "Deposits", icon: Banknote },
+  { href: "/#games", label: "Games", icon: Gamepad2, gamesLink: true as const },
+  { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
+  { href: "/dashboard/deposits", label: "My Deposits", icon: History },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
@@ -69,9 +72,10 @@ function NavLinks({
     <>
       {userLinks.map((link) => {
         const Icon = link.icon;
-        const active =
-          pathname === link.href ||
-          (link.href !== "/dashboard" && pathname.startsWith(link.href));
+        const active = link.gamesLink
+          ? pathname === "/" || pathname.startsWith("/games")
+          : pathname === link.href ||
+            (link.href !== "/dashboard" && pathname.startsWith(link.href));
         return (
           <Link
             key={link.href}

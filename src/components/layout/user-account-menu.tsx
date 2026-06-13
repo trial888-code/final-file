@@ -13,6 +13,8 @@ import {
   Users,
   StarHalf,
   Target,
+  Gamepad2,
+  Banknote,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { logoutUser } from "@/lib/auth/logout";
@@ -23,6 +25,8 @@ import { toast } from "sonner";
 
 const MENU_LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/#games", label: "Games", icon: Gamepad2 },
+  { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
