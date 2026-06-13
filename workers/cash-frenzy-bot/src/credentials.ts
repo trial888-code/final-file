@@ -1,56 +1,8 @@
 /**
- * Cash Frenzy panel rules:
- * - Username: letters, numbers, underscore, 6–13 chars
- * - Password: letters and numbers ONLY (no underscore/symbols), 6–13 chars
+ * Cash Frenzy account names: letters/numbers/underscore, 13 chars or fewer
+ * (panel rule). Password defaults to the username unless the user picked one.
  */
-const MIN_LEN = 6;
 const MAX_LEN = 13;
-
-function cleanUsername(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9_]/g, "");
-}
-
-/** Password must be alphanumeric only — panel rejects underscores and symbols. */
-function cleanPassword(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-/** Cash Frenzy rejects letter-only or digit-only passwords — must include both. */
-function finalizePassword(raw: string): string {
-  let p = cleanPassword(raw);
-  if (p.length < MIN_LEN) p = `${p}123456789`.slice(0, MAX_LEN);
-  if (p.length < MIN_LEN) p = "player1";
-  if (!/[0-9]/.test(p)) p = `${p}1`.slice(0, MAX_LEN);
-  if (!/[a-z]/.test(p)) p = `a${p}`.slice(0, MAX_LEN);
-  if (p.length < MIN_LEN) p = "player1";
-  return p.slice(0, MAX_LEN);
-}
-
-function padPassword(base: string): string {
-  return finalizePassword(base);
-}
-
-/** Pad or trim so the panel accepts the value (6–13 chars). */
-export function normalizeUsername(raw: string): string {
-  let u = cleanUsername(raw).slice(0, MAX_LEN);
-  if (!u) u = "player";
-  if (u.length < MIN_LEN) {
-    u = `${u}123456`.slice(0, MAX_LEN);
-    if (u.length < MIN_LEN) u = "player1";
-  }
-  return u;
-}
-
-/** Password for a given login name — always 6–13 alphanumeric chars with letters AND digits. */
-export function passwordForAccount(username: string, preferred?: string): string {
-  const fallback = finalizePassword(`${cleanPassword(username) || "player"}1`);
-  if (!preferred?.trim()) return fallback;
-
-  const p = cleanPassword(preferred);
-  if (p.length >= MIN_LEN) return finalizePassword(p);
-  return fallback;
-}
-
 export function buildCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
@@ -76,11 +28,12 @@ export function buildCredentials(profile: {
     }
   }
 
-  const username = normalizeUsername(base || "player");
-  return { username, password: passwordForAccount(username) };
+  if (!base) base = "player";
+
+  const username = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN);
+  return { username, password: username };
 }
 
-/** Random suffix from an unambiguous alphabet (no 0/o/1/l/i). */
 function randomSuffix(len: number): string {
   const chars = "abcdefghjkmnpqrstuvwxyz23456789";
   let s = "";
@@ -89,7 +42,7 @@ function randomSuffix(len: number): string {
 }
 
 export function usernameVariant(base: string, attempt: number): string {
-  const clean = normalizeUsername(base);
+  const clean = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN) || "player";
   if (attempt <= 0) return clean;
 
   let suffix: string;
@@ -97,6 +50,5 @@ export function usernameVariant(base: string, attempt: number): string {
   else suffix = randomSuffix(attempt <= 5 ? 2 : 3);
 
   const room = MAX_LEN - suffix.length;
-  const variant = `${clean.slice(0, Math.max(1, room))}${suffix}`;
-  return normalizeUsername(variant);
+  return `${clean.slice(0, Math.max(1, room))}${suffix}`;
 }

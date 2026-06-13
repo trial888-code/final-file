@@ -4,13 +4,13 @@ cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo   SPINORA GAME VAULT BOT
+echo   SPINORA CASH FRENZY BOT
 echo ============================================================
 echo.
 echo   BEFORE this works you need:
 echo     [x] start-chrome-for-bot.bat was run
 echo     [x] VPN is ON in that Chrome window (if the panel needs it)
-echo     [x] https://agentserver.cashfrenzy777.com is LOGGED IN
+echo     [x] https://agentserver.cashfrenzy777.com is LOGGED IN with User List open
 echo.
 echo ============================================================
 echo.

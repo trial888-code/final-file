@@ -24,12 +24,12 @@ echo   FIRST TIME:
 echo     1. Chrome opens - install your VPN extension if the panel needs it
 echo     2. Turn VPN ON in that Chrome (if required)
 echo     3. Log in at https://agentserver.cashfrenzy777.com/admin/login (CAPTCHA)
-echo     4. Open Game User -^> User Management on /admin
+echo     4. Click User List in the sidebar (NOT /admin/userManagement)
 echo.
 echo   EVERY TIME AFTER:
 echo     1. Run this file
 echo     2. Make sure the panel is logged in
-echo     3. Open Game User -^> User Management
+echo     3. Open User List in the sidebar
 echo     4. Then run start-bot.bat
 echo.
 echo ============================================================
@@ -37,5 +37,5 @@ echo.
 
 start "" "%CHROME%" --remote-debugging-port=9229 --user-data-dir="%PROFILE%" "https://agentserver.cashfrenzy777.com/admin/login"
 
-echo Chrome started on port 9229. Log in, open Game User -^> User Management, then run start-bot.bat
+echo Chrome started on port 9229. Log in, open User List, then run start-bot.bat
 pause

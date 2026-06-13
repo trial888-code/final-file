@@ -26,8 +26,39 @@ function launchOptions() {
   };
 }
 
-/** Pick the panel tab, not about:blank or VPN extension tabs */
+/** Pick the panel tab with User List open — avoid stale /userManagement 404 tabs. */
+async function isUsablePanelPage(page: Page): Promise<boolean> {
+  const url = page.url();
+  if (!url.includes(PANEL_HOST) || url.includes("about:")) return false;
+
+  const body = (await page.locator("body").innerText().catch(() => "")).trim();
+  if (body.includes("404 Not Found") && body.length < 120) return false;
+
+  const search = page.getByPlaceholder(/search content|please enter/i).first();
+  if (await search.isVisible().catch(() => false)) return true;
+
+  return /backend/i.test(body) && /user list/i.test(body);
+}
+
 async function findPanelPage(pages: Page[]): Promise<Page> {
+  for (const page of pages) {
+    if (!(await isUsablePanelPage(page))) continue;
+    const search = page.getByPlaceholder(/search content|please enter/i).first();
+    if (await search.isVisible().catch(() => false)) {
+      console.log("[cf] Using tab:", page.url());
+      await page.bringToFront();
+      return page;
+    }
+  }
+
+  for (const page of pages) {
+    if (await isUsablePanelPage(page)) {
+      console.log("[cf] Using tab:", page.url());
+      await page.bringToFront();
+      return page;
+    }
+  }
+
   for (const page of pages) {
     const url = page.url();
     if (url.includes(PANEL_HOST) && !url.includes("about:")) {

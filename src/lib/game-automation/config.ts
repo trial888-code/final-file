@@ -23,8 +23,8 @@ export function getGameVaultAdminPanelUrl(): string | null {
 }
 
 /**
- * Cash Frenzy agent panel URL. Layui MDI backend (same family as Gameroom).
- * Defaults to the public login page; override with CASHFRENZY_ADMIN_URL.
+ * Cash Frenzy agent panel URL. Same Element Plus "Backend" UI as Game Vault
+ * (User List / New Account / editor → Recharge / Redeem), hosted under /admin.
  */
 export function getCashFrenzyAdminPanelUrl(): string | null {
   return process.env.CASHFRENZY_ADMIN_URL?.trim() || "https://agentserver.cashfrenzy777.com/admin/login";
