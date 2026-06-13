@@ -15,7 +15,6 @@ import {
   UserPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getMyGameAccount } from "@/lib/actions/game-loads";
 import {
   GAME_BONUS_RULES,
   getOtherGames,
@@ -62,9 +61,6 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
 
   function openWalletPanel() {
     setShowWalletPanel(true);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(`wallet-panel-${game.slug}`, "1");
-    }
     setTimeout(() => {
       walletPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
@@ -87,23 +83,6 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
 
     openWalletPanel();
   }
-
-  useEffect(() => {
-    if (!walletLoadEnabled) return;
-
-    const fromSession =
-      typeof window !== "undefined" &&
-      sessionStorage.getItem(`wallet-panel-${game.slug}`) === "1";
-
-    if (fromSession) {
-      setShowWalletPanel(true);
-      return;
-    }
-
-    void getMyGameAccount(game.slug).then((account) => {
-      if (account?.game_username) setShowWalletPanel(true);
-    });
-  }, [walletLoadEnabled, game.slug]);
 
   useEffect(() => {
     if (!autoCreate || autoCreateAttempted.current) return;
