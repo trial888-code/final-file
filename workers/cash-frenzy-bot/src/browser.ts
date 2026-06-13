@@ -31,19 +31,23 @@ async function isUsablePanelPage(page: Page): Promise<boolean> {
   const url = page.url();
   if (!url.includes(PANEL_HOST) || url.includes("about:")) return false;
 
-  const body = (await page.locator("body").innerText().catch(() => "")).trim();
+  const body = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
   if (body.includes("404 Not Found") && body.length < 120) return false;
 
-  const search = page.getByPlaceholder(/search content|please enter/i).first();
+  if (await page.getByRole("button", { name: /new account/i }).first().isVisible().catch(() => false)) {
+    return true;
+  }
+
+  const search = page.locator('input[placeholder*="search" i], input[placeholder*="enter" i]').first();
   if (await search.isVisible().catch(() => false)) return true;
 
-  return /backend/i.test(body) && /user list/i.test(body);
+  return /backend/i.test(body) && /user list/i.test(body) && /new account/i.test(body);
 }
 
 async function findPanelPage(pages: Page[]): Promise<Page> {
   for (const page of pages) {
     if (!(await isUsablePanelPage(page))) continue;
-    const search = page.getByPlaceholder(/search content|please enter/i).first();
+    const search = page.locator('input[placeholder*="search" i], input[placeholder*="enter" i]').first();
     if (await search.isVisible().catch(() => false)) {
       console.log("[cf] Using tab:", page.url());
       await page.bringToFront();

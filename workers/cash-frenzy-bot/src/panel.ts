@@ -14,11 +14,14 @@ export async function loginToPanel(page: Page): Promise<void> {
     return;
   }
 
-  await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  const onAdmin = /cashfrenzy777\.com\/admin/i.test(page.url()) && !(await isLoginPage(page));
+  if (!onAdmin) {
+    await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+  }
 
   if (!(await isLoginPage(page))) {
-    await gotoUserList(page);
+    if (!(await isUserListReady(page))) await gotoUserList(page);
     log("login", "already authenticated");
     return;
   }
@@ -89,12 +92,22 @@ async function clickDialogButton(dlg: Locator, pattern: RegExp): Promise<void> {
 
 /* ----------------------------------------------------------- user listing */
 
+function searchInput(page: Page): Locator {
+  return page
+    .locator(
+      'input[placeholder*="search content" i], input[placeholder*="please enter" i], .el-input__inner[placeholder*="search" i], .el-input__inner[placeholder*="enter" i]'
+    )
+    .first();
+}
+
 async function isUserListReady(page: Page): Promise<boolean> {
-  const search = page.getByPlaceholder(/search content|please enter/i).first();
-  if (!(await search.isVisible().catch(() => false))) return false;
-  return listTable(page)
-    .isVisible()
-    .catch(() => false);
+  if (await page.getByRole("button", { name: /new account/i }).first().isVisible().catch(() => false)) {
+    return true;
+  }
+  if (await searchInput(page).isVisible().catch(() => false)) return true;
+
+  const body = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
+  return /new account/i.test(body) && /register date/i.test(body) && /search by account/i.test(body);
 }
 
 async function pageLooksLike404(page: Page): Promise<boolean> {
@@ -102,12 +115,33 @@ async function pageLooksLike404(page: Page): Promise<boolean> {
   return body.includes("404 Not Found") && body.length < 120;
 }
 
+async function clickSidebarUserList(page: Page): Promise<void> {
+  const candidates: Locator[] = [
+    page.getByText("User List", { exact: true }),
+    page.locator(".el-menu-item").filter({ hasText: /^\s*User List\s*$/i }),
+    page.locator("a, li, span").filter({ hasText: /^\s*User List\s*$/i }),
+  ];
+  for (const loc of candidates) {
+    const item = loc.first();
+    if (await item.isVisible().catch(() => false)) {
+      await item.click().catch(() => {});
+      await page.waitForTimeout(1500);
+      return;
+    }
+  }
+}
+
 /** Cash Frenzy uses the same Backend UI as Game Vault but lives under /admin (no /userManagement route). */
 async function gotoUserList(page: Page): Promise<void> {
   await closeOverlays(page);
   if (await isUserListReady(page)) return;
 
-  for (const path of ["/userList", "/userManagement"]) {
+  if (/cashfrenzy777\.com\/admin/i.test(page.url()) && !(await pageLooksLike404(page))) {
+    await clickSidebarUserList(page);
+    if (await isUserListReady(page)) return;
+  }
+
+  for (const path of ["/userList"]) {
     await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(1500);
     if (await pageLooksLike404(page)) continue;
@@ -116,15 +150,7 @@ async function gotoUserList(page: Page): Promise<void> {
 
   await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(1000);
-
-  const userList = page
-    .locator(".el-menu-item, .el-sub-menu__title, a, li, span")
-    .filter({ hasText: /^\s*User List\s*$/i })
-    .first();
-  if (await userList.isVisible().catch(() => false)) {
-    await userList.click();
-    await page.waitForTimeout(1500);
-  }
+  await clickSidebarUserList(page);
 
   if (await isUserListReady(page)) return;
 
@@ -134,14 +160,15 @@ async function gotoUserList(page: Page): Promise<void> {
   );
 }
 
-/** The main list table (the one with the "Register date" column). */
+/** Main player table — prefer the one showing Account / Balance columns. */
 function listTable(page: Page): Locator {
-  return page.locator(".el-table").filter({ hasText: "Register date" }).first();
+  const withAccount = page.locator(".el-table").filter({ has: page.locator("th").filter({ hasText: /^Account$/i }) });
+  return withAccount.first().or(page.locator(".el-table").first());
 }
 
 async function searchAccount(page: Page, account: string): Promise<void> {
   await gotoUserList(page);
-  const search = page.getByPlaceholder(/search content|please enter/i).first();
+  const search = searchInput(page);
   await search.waitFor({ state: "visible", timeout: 15000 });
   await search.click();
   await search.fill("");
