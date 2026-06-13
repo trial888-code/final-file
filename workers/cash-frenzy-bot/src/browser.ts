@@ -30,28 +30,29 @@ function launchOptions() {
 async function isUsablePanelPage(page: Page): Promise<boolean> {
   const url = page.url();
   if (!url.includes(PANEL_HOST) || url.includes("about:")) return false;
+  if (/\/userList|\/userManagement/i.test(url)) return false;
 
   const body = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
-  if (body.includes("404 Not Found") && body.length < 120) return false;
+  if (/404\s*not\s*found/i.test(body) && body.length < 200) return false;
 
-  if (await page.getByRole("button", { name: /new account/i }).first().isVisible().catch(() => false)) {
-    return true;
-  }
-
-  const search = page.locator('input[placeholder*="search" i], input[placeholder*="enter" i]').first();
-  if (await search.isVisible().catch(() => false)) return true;
-
-  return /backend/i.test(body) && /user list/i.test(body) && /new account/i.test(body);
+  return /backend/i.test(body) && /new account/i.test(body) && /user list/i.test(body);
 }
 
 async function findPanelPage(pages: Page[]): Promise<Page> {
   for (const page of pages) {
     if (!(await isUsablePanelPage(page))) continue;
-    const search = page.locator('input[placeholder*="search" i], input[placeholder*="enter" i]').first();
-    if (await search.isVisible().catch(() => false)) {
-      console.log("[cf] Using tab:", page.url());
-      await page.bringToFront();
-      return page;
+    try {
+      const ready = await page.evaluate(() => {
+        const t = document.body?.innerText ?? "";
+        return /new account/i.test(t) && /register date/i.test(t);
+      });
+      if (ready) {
+        console.log("[cf] Using tab:", page.url());
+        await page.bringToFront();
+        return page;
+      }
+    } catch {
+      /* try next tab */
     }
   }
 
@@ -65,7 +66,7 @@ async function findPanelPage(pages: Page[]): Promise<Page> {
 
   for (const page of pages) {
     const url = page.url();
-    if (url.includes(PANEL_HOST) && !url.includes("about:")) {
+    if (url.includes(PANEL_HOST) && !url.includes("about:") && !/\/userList|\/userManagement/i.test(url)) {
       console.log("[cf] Using tab:", url);
       await page.bringToFront();
       return page;

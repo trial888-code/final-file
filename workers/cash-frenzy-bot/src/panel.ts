@@ -21,7 +21,7 @@ export async function loginToPanel(page: Page): Promise<void> {
   }
 
   if (!(await isLoginPage(page))) {
-    if (!(await isUserListReady(page))) await gotoUserList(page);
+    if (!(await isUserListReady(page))) await ensureUserList(page);
     log("login", "already authenticated");
     return;
   }
@@ -43,7 +43,7 @@ export async function loginToPanel(page: Page): Promise<void> {
     process.env.CASHFRENZY_HEADLESS === "false" || Boolean(process.env.CASHFRENZY_CDP_URL);
   if (interactive) {
     await waitForManualLogin(page);
-    await gotoUserList(page);
+    await ensureUserList(page);
     log("login", "success (manual captcha)");
     return;
   }
@@ -92,38 +92,41 @@ async function clickDialogButton(dlg: Locator, pattern: RegExp): Promise<void> {
 
 /* ----------------------------------------------------------- user listing */
 
-function searchInput(page: Page): Locator {
-  return page
-    .locator(
-      'input[placeholder*="search content" i], input[placeholder*="please enter" i], .el-input__inner[placeholder*="search" i], .el-input__inner[placeholder*="enter" i]'
-    )
-    .first();
-}
-
 async function isUserListReady(page: Page): Promise<boolean> {
-  if (await page.getByRole("button", { name: /new account/i }).first().isVisible().catch(() => false)) {
-    return true;
+  try {
+    return await page.evaluate(() => {
+      const t = (document.body?.innerText ?? "").replace(/\s+/g, " ");
+      if (!/backend/i.test(t)) return false;
+      const hasNewAccount = /new account/i.test(t);
+      const hasTable = /register date/i.test(t) || (/^account$/im.test(t) && /balance/i.test(t));
+      const hasSearch =
+        /search by account/i.test(t) ||
+        /please enter your search/i.test(t) ||
+        /search content/i.test(t);
+      return hasNewAccount && hasTable && hasSearch;
+    });
+  } catch {
+    return false;
   }
-  if (await searchInput(page).isVisible().catch(() => false)) return true;
-
-  const body = (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ");
-  return /new account/i.test(body) && /register date/i.test(body) && /search by account/i.test(body);
 }
 
 async function pageLooksLike404(page: Page): Promise<boolean> {
+  const url = page.url();
+  if (/\/userList|\/userManagement/i.test(url)) return true;
   const body = (await page.locator("body").innerText().catch(() => "")).trim();
-  return body.includes("404 Not Found") && body.length < 120;
+  return /404\s*not\s*found/i.test(body) && body.length < 200;
 }
 
 async function clickSidebarUserList(page: Page): Promise<void> {
   const candidates: Locator[] = [
+    page.locator(".el-menu-item").filter({ hasText: /user list/i }),
     page.getByText("User List", { exact: true }),
-    page.locator(".el-menu-item").filter({ hasText: /^\s*User List\s*$/i }),
     page.locator("a, li, span").filter({ hasText: /^\s*User List\s*$/i }),
   ];
   for (const loc of candidates) {
     const item = loc.first();
     if (await item.isVisible().catch(() => false)) {
+      log("nav", "clicking User List in sidebar");
       await item.click().catch(() => {});
       await page.waitForTimeout(1500);
       return;
@@ -131,33 +134,37 @@ async function clickSidebarUserList(page: Page): Promise<void> {
   }
 }
 
-/** Cash Frenzy uses the same Backend UI as Game Vault but lives under /admin (no /userManagement route). */
-async function gotoUserList(page: Page): Promise<void> {
+/**
+ * Cash Frenzy is a SPA on /admin only — never open /admin/userList or /admin/userManagement (both 404).
+ */
+async function ensureUserList(page: Page): Promise<void> {
   await closeOverlays(page);
   if (await isUserListReady(page)) return;
 
-  if (/cashfrenzy777\.com\/admin/i.test(page.url()) && !(await pageLooksLike404(page))) {
+  if (await pageLooksLike404(page)) {
+    log("nav", "404 tab — returning to /admin");
+    await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+  }
+
+  if (/cashfrenzy777\.com\/admin/i.test(page.url())) {
     await clickSidebarUserList(page);
-    if (await isUserListReady(page)) return;
   }
-
-  for (const path of ["/userList"]) {
-    await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(1500);
-    if (await pageLooksLike404(page)) continue;
-    if (await isUserListReady(page)) return;
-  }
-
-  await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-  await page.waitForTimeout(1000);
-  await clickSidebarUserList(page);
 
   if (await isUserListReady(page)) return;
 
   await screenshot(page, "user-list-nav-failed");
   throw new Error(
-    "Could not open User List. In bot Chrome stay logged in on /admin, click User List in the sidebar, then retry."
+    "Could not see User List on /admin. In bot Chrome open User List in the sidebar (stay on /admin — do not open /admin/userList), then retry."
   );
+}
+
+function searchInput(page: Page): Locator {
+  return page
+    .locator(
+      'input[placeholder*="search content" i], input[placeholder*="please enter" i], .el-input__inner[placeholder*="search" i], .el-input__inner[placeholder*="enter" i]'
+    )
+    .first();
 }
 
 /** Main player table — prefer the one showing Account / Balance columns. */
@@ -167,7 +174,7 @@ function listTable(page: Page): Locator {
 }
 
 async function searchAccount(page: Page, account: string): Promise<void> {
-  await gotoUserList(page);
+  await ensureUserList(page);
   const search = searchInput(page);
   await search.waitFor({ state: "visible", timeout: 15000 });
   await search.click();
@@ -323,8 +330,8 @@ type CreateOutcome =
   | { status: "error"; message: string };
 
 async function tryCreateOnce(page: Page, username: string, password: string): Promise<CreateOutcome> {
-  await gotoUserList(page);
-  await page.getByRole("button", { name: /new account/i }).first().click();
+  await ensureUserList(page);
+  await page.locator("button, .el-button").filter({ hasText: /new account/i }).first().click();
   await page.waitForTimeout(1000);
 
   const dlg = visibleDialog(page);

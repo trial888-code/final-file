@@ -24,7 +24,7 @@ echo   FIRST TIME:
 echo     1. Chrome opens - install your VPN extension if the panel needs it
 echo     2. Turn VPN ON in that Chrome (if required)
 echo     3. Log in at https://agentserver.cashfrenzy777.com/admin/login (CAPTCHA)
-echo     4. Click User List in the sidebar (NOT /admin/userManagement)
+echo     4. Click User List in the sidebar — stay on /admin (never open /admin/userList)
 echo.
 echo   EVERY TIME AFTER:
 echo     1. Run this file
