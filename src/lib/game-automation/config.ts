@@ -35,6 +35,10 @@ export function getMrAllInOneAdminPanelUrl(): string | null {
   return process.env.MRALLINONE_ADMIN_URL?.trim() || "https://agentserver.mrallinone777.com/admin/login";
 }
 
+export function getMafiaAdminPanelUrl(): string | null {
+  return process.env.MAFIA_ADMIN_URL?.trim() || "https://agentserver.mafia77777.com/admin/login";
+}
+
 export function getAutomationSecret(): string | null {
   return process.env.GAME_AUTOMATION_SECRET?.trim() || null;
 }

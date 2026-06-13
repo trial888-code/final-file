@@ -119,7 +119,7 @@ async function getListScope(page: Page): Promise<ListScope> {
   await assertPageOpen(page);
 
   if (/player\/index/i.test(page.url())) {
-    await page.locator('input[name="account"]').first().waitFor({ state: "visible", timeout: 20000 });
+    await page.locator('input[name="account"], input[name="username"]').first().waitFor({ state: "visible", timeout: 20000 });
     log("nav", "using standalone player list tab");
     return page;
   }
@@ -134,7 +134,7 @@ async function getListScope(page: Page): Promise<ListScope> {
   }
 
   if (frame) {
-    await frame.locator('input[name="account"]').first().waitFor({ state: "visible", timeout: 20000 });
+    await findSearchInput(frame).then((el) => el.waitFor({ state: "visible", timeout: 20000 }));
     log("nav", "using User Management iframe on /admin");
     return frame;
   }
@@ -149,17 +149,38 @@ function mainRows(scope: ListScope): Locator {
   return scope.locator(".layui-table-main tbody tr");
 }
 
+const USERNAME_CELL =
+  'td[data-field="Account"] .layui-table-cell, td[data-field="Account"], td[data-field="Username"] .layui-table-cell, td[data-field="Username"]';
+
+const BALANCE_CELL =
+  'td[data-field="score"] .layui-table-cell, td[data-field="score"], td[data-field="balance"] .layui-table-cell, td[data-field="balance"], td[data-field="Balance"] .layui-table-cell, td[data-field="Balance"]';
+
+function pageRoots(page: Page): Array<Page | Frame> {
+  return [page, ...page.frames()];
+}
+
 function rowsWithAccount(scope: ListScope): Locator {
-  return scope.locator("table tbody tr").filter({ has: scope.locator('td[data-field="Account"]') });
+  return scope
+    .locator("table tbody tr")
+    .filter({ has: scope.locator('td[data-field="Account"], td[data-field="Username"]') });
 }
 
 async function accountVisibleInTable(scope: ListScope, username: string): Promise<boolean> {
   const target = username.toLowerCase();
-  const cells = await scope
-    .locator('td[data-field="Account"] .layui-table-cell, td[data-field="Account"]')
-    .allInnerTexts()
-    .catch(() => [] as string[]);
+  const cells = await scope.locator(USERNAME_CELL).allInnerTexts().catch(() => [] as string[]);
   return cells.some((c) => c.trim().toLowerCase() === target);
+}
+
+async function findSearchInput(scope: ListScope): Promise<Locator> {
+  for (const sel of [
+    'input[name="account"]',
+    'input[name="username"]',
+    'input[placeholder*="Username" i]',
+  ]) {
+    const loc = scope.locator(sel).first();
+    if ((await loc.count()) > 0 && (await loc.isVisible().catch(() => false))) return loc;
+  }
+  throw new Error("User search input not found in User Management");
 }
 
 async function searchAccount(page: Page, account: string): Promise<ListScope> {
@@ -173,7 +194,7 @@ async function searchAccount(page: Page, account: string): Promise<ListScope> {
     await rootPage(scope).waitForTimeout(600);
   }
 
-  const search = scope.locator('input[name="account"]').first();
+  const search = await findSearchInput(scope);
   await search.click();
   await search.fill("");
   await search.fill(account);
@@ -201,7 +222,7 @@ async function findRowIndex(scope: ListScope, account: string, timeout = 12000):
     for (let i = 0; i < count; i++) {
       const cell = (await rows
         .nth(i)
-        .locator('td[data-field="Account"] .layui-table-cell, td[data-field="Account"]')
+        .locator(USERNAME_CELL)
         .first()
         .innerText()
         .catch(() => ""))
@@ -230,7 +251,7 @@ export async function readBalance(page: Page, account: string): Promise<number> 
   const rows = (await mainRows(scope).count()) > 0 ? mainRows(scope) : rowsWithAccount(scope);
   const text = (await rows
     .nth(idx)
-    .locator('td[data-field="score"] .layui-table-cell, td[data-field="score"]')
+    .locator(BALANCE_CELL)
     .first()
     .innerText()
     .catch(() => ""))
@@ -264,11 +285,82 @@ async function layerShadeVisible(page: Page): Promise<boolean> {
   return page.locator(".layui-layer-shade").first().isVisible().catch(() => false);
 }
 
-/** Close any open layui popup (Add user / Recharge / etc.) so the list is clickable. */
+/** After create, layui shows ACCOUNT/PASSWORD summary — must click Close (not just X). */
+async function readCredentialSummary(page: Page): Promise<{ username: string; password: string } | null> {
+  for (const root of pageRoots(page)) {
+    const layers = root.locator(".layui-layer");
+    const count = await layers.count();
+    for (let i = count - 1; i >= 0; i--) {
+      const layer = layers.nth(i);
+      if (!(await layer.isVisible().catch(() => false))) continue;
+      const text = (await layer.innerText().catch(() => "")).replace(/\s+/g, " ");
+      if (!/(ACCOUNT|USERNAME|Login\s*name)/i.test(text) || !/PASSWORD/i.test(text)) continue;
+      const username =
+        text.match(/(?:ACCOUNT|USERNAME|Login\s*name)\s*:\s*(\S+)/i)?.[1]?.toLowerCase() ?? "";
+      const password = text.match(/PASSWORD\s*:\s*(\S+)/i)?.[1]?.toLowerCase() ?? "";
+      if (username && password) return { username, password };
+    }
+  }
+  return null;
+}
+
+async function dismissCredentialSuccessDialog(page: Page): Promise<boolean> {
+  for (const root of pageRoots(page)) {
+    const layer = root.locator(".layui-layer").filter({ hasText: /ACCOUNT|USERNAME|PASSWORD/i }).last();
+    if (!(await layer.isVisible().catch(() => false))) continue;
+
+    const closeBtn = layer
+      .locator("a, button, .layui-btn, span")
+      .filter({ hasText: /^Close$/i })
+      .last();
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await closeBtn.click({ force: true });
+      log("panel", "clicked Close on credential summary dialog");
+      await page.waitForTimeout(700);
+      return true;
+    }
+  }
+
+  const fallback = page.getByRole("button", { name: /^Close$/i }).last();
+  if (await fallback.isVisible().catch(() => false)) {
+    await fallback.click({ force: true });
+    log("panel", "clicked Close button");
+    await page.waitForTimeout(700);
+    return true;
+  }
+  return false;
+}
+
+async function waitForCredentialSummary(
+  page: Page,
+  username: string,
+  timeoutMs = 12000
+): Promise<{ username: string; password: string } | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const summary = await readCredentialSummary(page);
+    if (summary) return summary;
+    await page.waitForTimeout(350);
+  }
+  return null;
+}
+
+/** Close any open layui popup (Add user / Recharge / credential summary / etc.). */
 async function dismissAllLayers(page: Page): Promise<void> {
   await assertPageOpen(page);
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
+    await dismissCredentialSuccessDialog(page);
     if (!(await layerShadeVisible(page))) break;
+    const closeBtn = page
+      .locator(".layui-layer:visible .layui-btn, .layui-layer:visible button")
+      .filter({ hasText: /^\s*Close\s*$/i })
+      .last();
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(500);
+      continue;
+    }
     await page.locator(".layui-layer-close").last().click({ force: true }).catch(() => {});
     await page.keyboard.press("Escape").catch(() => {});
     await page.waitForTimeout(500);
@@ -460,7 +552,7 @@ const VALIDATION_RE =
 const SUCCESS_RE = /success|成功|added|complete|created/i;
 
 type CreateOutcome =
-  | { status: "created" }
+  | { status: "created"; password?: string }
   | { status: "duplicate" }
   | { status: "error"; message: string };
 
@@ -503,11 +595,30 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   );
 
   const body = await submitFormAndWait(page, frame, "insert");
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(800);
+
+  const summary = await waitForCredentialSummary(page, username);
+  if (summary) {
+    log("create", `panel showed credentials for ${summary.username}`);
+    await dismissCredentialSuccessDialog(page);
+    await dismissAllLayers(page);
+    if (summary.username === username.toLowerCase()) {
+      return { status: "created", password: summary.password };
+    }
+  }
+
+  await dismissCredentialSuccessDialog(page);
+  await dismissAllLayers(page);
 
   const stillOpen = await insertFrameOpen(page);
   const msgFrame = stillOpen ?? frame;
   const msg = [body, await readPanelMessages(page, msgFrame)].filter(Boolean).join(" ");
+
+  if (insertResponseOk(body) || SUCCESS_RE.test(msg)) {
+    log("create", `insert succeeded for ${username} — completing job`);
+    await dismissAllLayers(page);
+    return { status: "created" };
+  }
 
   if (stillOpen) {
     const emptyUser = !(await stillOpen.locator('input[name="username"]').first().inputValue()).trim();
@@ -520,12 +631,9 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   }
 
   await waitForLayerClosed(page, "insert", 20000).catch(() => {});
+  await dismissAllLayers(page);
 
-  if (insertResponseOk(body) || SUCCESS_RE.test(msg)) {
-    if (await waitForAccountListed(page, username, 22000)) return { status: "created" };
-    await getListScope(page);
-    if (await waitForAccountListed(page, username, 12000)) return { status: "created" };
-  }
+  if (await waitForAccountListed(page, username, 12000)) return { status: "created" };
 
   await dismissAllLayers(page);
 
@@ -554,14 +662,15 @@ export async function createAccount(
     const pwd = passwordForAccount(username, password);
 
     if (await accountExists(page, username)) {
-      log("create", `"${username}" already exists — trying next variant`);
-      continue;
+      log("create", `"${username}" already on panel — completing job with this login`);
+      await dismissAllLayers(page);
+      return { username, password: pwd };
     }
 
     const outcome = await tryCreateOnce(page, username, pwd);
     if (outcome.status === "created") {
       log("create", `created ${username}`);
-      return { username, password: pwd };
+      return { username, password: outcome.password ?? pwd };
     }
     if (outcome.status === "duplicate") {
       if (await accountExists(page, username)) {
