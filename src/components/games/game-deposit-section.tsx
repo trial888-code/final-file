@@ -8,6 +8,7 @@ import {
   Check,
   Copy,
   Download,
+  ExternalLink,
   Loader2,
   Upload,
 } from "lucide-react";
@@ -198,14 +199,27 @@ export function GameDepositSection({ game }: GameDepositSectionProps) {
         <div className="flex flex-col justify-center min-w-0">
           <p className="text-xs text-muted-foreground mb-1">{method.copyLabel}</p>
           <p className="font-mono text-sm text-white break-all mb-3">{method.username}</p>
-          <button
-            type="button"
-            onClick={handleCopyUsername}
-            className="inline-flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-sm font-semibold bg-[#2a2a2a] border border-white/10 hover:border-white/20 text-white transition-colors w-full sm:w-auto"
-          >
-            <Copy className="h-4 w-4" />
-            Copy {method.label} details
-          </button>
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleCopyUsername}
+              className="inline-flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-sm font-semibold bg-[#2a2a2a] border border-white/10 hover:border-white/20 text-white transition-colors w-full"
+            >
+              <Copy className="h-4 w-4" />
+              Copy {method.label} details
+            </button>
+            {method.payLink && (
+              <a
+                href={method.payLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-sm font-semibold bg-orange-500/15 border border-orange-500/40 hover:border-orange-500/60 text-orange-200 transition-colors w-full"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Pay using link
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
