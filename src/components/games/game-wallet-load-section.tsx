@@ -26,6 +26,7 @@ import {
 } from "@/lib/actions/game-loads";
 import type { Game } from "@/lib/games";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
+import { isGameAccountCreateLoadType } from "@/lib/game-automation/account-create";
 import { WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
 import { previewJuwaUsername } from "@/lib/game-automation/juwa-credentials";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -33,6 +34,7 @@ import { toast } from "sonner";
 
 interface GameWalletLoadSectionProps {
   game: Game;
+  onAccountChange?: (hasAccount: boolean) => void;
 }
 
 /** Layui agent panels (Gameroom family) — stricter username/password rules. */
@@ -42,7 +44,7 @@ function isLayuiPanelGame(slug: string): boolean {
   return (LAYUI_PANEL_SLUGS as readonly string[]).includes(slug);
 }
 
-export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
+export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadSectionProps) {
   const supabase = useMemo(() => createClient(), []);
 
   const [walletBalance, setWalletBalance] = useState(0);
@@ -107,7 +109,7 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
     const completedCreate = loads.find(
       (l) =>
         l.status === "completed" &&
-        (l.load_type === "create_account" || l.load_type === "new_account") &&
+        isGameAccountCreateLoadType(l.load_type) &&
         l.game_username
     );
     if (completedCreate?.game_username) {
@@ -117,6 +119,10 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
       });
     }
   }, [game.slug]);
+
+  useEffect(() => {
+    onAccountChange?.(Boolean(savedAccount?.game_username));
+  }, [savedAccount, onAccountChange]);
 
   useEffect(() => {
     void refreshWallet();
@@ -141,7 +147,7 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
   const previewAccount = previewJuwaUsername(requesterName, requesterEmail);
   const pendingCreate = recentLoads.some(
     (l) =>
-      (l.load_type === "create_account" || l.load_type === "new_account") &&
+      isGameAccountCreateLoadType(l.load_type) &&
       (l.status === "pending" || l.status === "processing")
   );
   const pendingLoad = recentLoads.some(
@@ -166,18 +172,32 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
     toast.success(`${label} copied`);
   }
 
+  const hasSavedAccount = Boolean(savedAccount?.game_username);
+
   async function handleCreateAccount(custom?: { username: string; password: string }) {
+    if (hasSavedAccount) {
+      const ok = window.confirm(
+        `Replace your ${game.name} login?\n\nA new username and password will be created. Your current login (${savedAccount!.game_username}) will no longer be shown here.`
+      );
+      if (!ok) return;
+    }
+
     setCreating(true);
     const result = await requestGameAccountCreate({
       gameSlug: game.slug,
       gameName: game.name,
       username: custom?.username,
       password: custom?.password,
+      replaceAccount: hasSavedAccount,
     });
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success(`Creating your ${game.name} account…`);
+      toast.success(
+        hasSavedAccount
+          ? `Replacing your ${game.name} account…`
+          : `Creating your ${game.name} account…`
+      );
       setCustomMode(false);
       setCustomUsername("");
       setCustomPassword("");
@@ -307,7 +327,7 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
   }
 
   function activityLabel(load: GameLoadRequest) {
-    if (load.load_type === "create_account" || load.load_type === "new_account") {
+    if (isGameAccountCreateLoadType(load.load_type)) {
       return "Create account";
     }
     if (load.load_type === "check_balance") {
@@ -413,7 +433,9 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
 
         {customMode ? (
           <div className="space-y-2 rounded-lg border border-emerald-500/30 bg-black/30 p-3">
-            <p className="text-xs font-semibold text-emerald-200">Choose your own login</p>
+            <p className="text-xs font-semibold text-emerald-200">
+              {hasSavedAccount ? "Choose login for your replacement account" : "Choose your own login"}
+            </p>
             <input
               type="text"
               value={customUsername}
@@ -445,7 +467,7 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
                 ) : (
                   <UserPlus className="h-4 w-4" />
                 )}
-                Create with these
+                {hasSavedAccount ? "Replace with these" : "Create with these"}
               </button>
               <button
                 type="button"
@@ -471,7 +493,13 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
               ) : (
                 <UserPlus className="h-4 w-4" />
               )}
-              {pendingCreate ? "Creating account…" : savedAccount ? "Create New Account" : "Create Account"}
+              {pendingCreate
+                ? hasSavedAccount
+                  ? "Replacing account…"
+                  : "Creating account…"
+                : hasSavedAccount
+                  ? "Replace Account"
+                  : "Create Account"}
             </button>
             <button
               type="button"
@@ -486,7 +514,13 @@ export function GameWalletLoadSection({ game }: GameWalletLoadSectionProps) {
           </div>
         )}
 
-        {!savedAccount && !customMode && previewAccount && (
+        {hasSavedAccount && !customMode && (
+          <p className="text-[11px] text-muted-foreground text-center">
+            One account per game — Replace gives you new login details only.
+          </p>
+        )}
+
+        {!hasSavedAccount && !customMode && previewAccount && (
           <p className="text-xs text-muted-foreground text-center">
             Will be created as <span className="font-mono text-emerald-300">{previewAccount}</span> (same password)
           </p>

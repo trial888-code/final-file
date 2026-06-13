@@ -11,6 +11,8 @@ export async function requestGameAccountCreate(input: {
   gameName: string;
   username?: string;
   password?: string;
+  /** Required when the user already has completed game credentials for this slug. */
+  replaceAccount?: boolean;
 }) {
   const supabase = await createClient();
   const {
@@ -20,6 +22,19 @@ export async function requestGameAccountCreate(input: {
 
   if (!isWalletLoadEnabledForGame(input.gameSlug)) {
     return { error: "Wallet load is not enabled for this game yet." };
+  }
+
+  const existing = await getMyGameAccount(input.gameSlug);
+  const hasAccount = Boolean(existing?.game_username);
+
+  if (hasAccount && !input.replaceAccount) {
+    return {
+      error: "You already have a game account. Use Replace Account to get new login details.",
+    };
+  }
+
+  if (!hasAccount && input.replaceAccount) {
+    return { error: "No account to replace yet. Create your first account instead." };
   }
 
   const username = input.username?.trim() || undefined;
@@ -54,11 +69,15 @@ export async function requestGameAccountCreate(input: {
     p_game_name: input.gameName,
     p_username: username ?? null,
     p_password: password ?? null,
+    p_replace: input.replaceAccount ?? false,
   });
 
   if (error) {
     if (error.message.includes("request_game_account_create")) {
       return { error: "Run supabase/redeem-wallets-and-balance-check.sql in Supabase SQL Editor first." };
+    }
+    if (error.message.includes("already have a game account")) {
+      return { error: error.message };
     }
     return { error: error.message };
   }

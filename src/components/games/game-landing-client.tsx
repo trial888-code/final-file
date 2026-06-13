@@ -15,6 +15,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getMyGameAccount } from "@/lib/actions/game-loads";
 import {
   GAME_BONUS_RULES,
   getOtherGames,
@@ -48,6 +49,7 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
   const autoCreateAttempted = useRef(false);
   const walletPanelRef = useRef<HTMLDivElement>(null);
   const [showWalletPanel, setShowWalletPanel] = useState(false);
+  const [hasGameAccount, setHasGameAccount] = useState(false);
   const [winner, setWinner] = useState<GameWinner | null>(null);
   const [moreWinners, setMoreWinners] = useState(0);
   const [showAllWinners, setShowAllWinners] = useState(false);
@@ -83,6 +85,13 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
 
     openWalletPanel();
   }
+
+  useEffect(() => {
+    if (!walletLoadEnabled || game.upcoming) return;
+    void getMyGameAccount(game.slug).then((account) => {
+      setHasGameAccount(Boolean(account?.game_username));
+    });
+  }, [walletLoadEnabled, game.slug, game.upcoming]);
 
   useEffect(() => {
     if (!autoCreate || autoCreateAttempted.current) return;
@@ -283,7 +292,7 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
           )}
         >
           <UserPlus className="h-5 w-5" />
-          {game.upcoming ? "Coming Soon" : "Create Account"}
+          {game.upcoming ? "Coming Soon" : hasGameAccount ? "Replace Account" : "Create Account"}
         </button>
 
         <div className="grid grid-cols-2 gap-3">
@@ -309,7 +318,10 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
 
       {!game.upcoming && walletLoadEnabled && showWalletPanel && (
         <div ref={walletPanelRef} className="scroll-mt-24">
-          <GameWalletLoadSection game={game} />
+          <GameWalletLoadSection
+            game={game}
+            onAccountChange={(hasAccount) => setHasGameAccount(hasAccount)}
+          />
         </div>
       )}
 

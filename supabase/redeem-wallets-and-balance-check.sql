@@ -203,7 +203,8 @@ CREATE OR REPLACE FUNCTION public.request_game_account_create(
   p_game_slug TEXT,
   p_game_name TEXT,
   p_username TEXT DEFAULT NULL,
-  p_password TEXT DEFAULT NULL
+  p_password TEXT DEFAULT NULL,
+  p_replace BOOLEAN DEFAULT FALSE
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -228,6 +229,28 @@ BEGIN
     RAISE EXCEPTION 'A request is already in progress for this game';
   END IF;
 
+  IF EXISTS (
+    SELECT 1 FROM game_load_requests
+    WHERE user_id = v_user_id
+      AND game_slug = p_game_slug
+      AND status = 'completed'
+      AND load_type IN ('create_account', 'new_account')
+      AND game_username IS NOT NULL
+  ) AND NOT COALESCE(p_replace, FALSE) THEN
+    RAISE EXCEPTION 'You already have a game account. Use Replace Account to get new login details.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM game_load_requests
+    WHERE user_id = v_user_id
+      AND game_slug = p_game_slug
+      AND status = 'completed'
+      AND load_type IN ('create_account', 'new_account')
+      AND game_username IS NOT NULL
+  ) AND COALESCE(p_replace, FALSE) THEN
+    RAISE EXCEPTION 'No account to replace yet. Create your first account instead.';
+  END IF;
+
   IF v_username IS NOT NULL AND v_password IS NULL THEN
     RAISE EXCEPTION 'Password required when choosing a custom username';
   END IF;
@@ -244,7 +267,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.request_game_account_create(TEXT, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.request_game_account_create(TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO authenticated;
 
 -- 7) Check live game balance ---------------------------------------------------
 CREATE OR REPLACE FUNCTION public.request_game_check_balance(
