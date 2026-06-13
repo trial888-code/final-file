@@ -142,8 +142,7 @@ export const GAMES: Game[] = [
     bio: "Panda Master is a fan-favorite fish game app featuring colorful underwater battles and massive coin rewards. Create your account on Spinora, download Panda Master, and join thousands of players hunting jackpots on every table.",
     players: 17586,
     gradient: "from-pink-400 via-rose-500 to-pink-900",
-    popular: true,
-    trending: true,
+    upcoming: true,
   },
   {
     id: "13",
@@ -156,8 +155,7 @@ export const GAMES: Game[] = [
     bio: "Vblink offers a sleek arcade gaming experience with fish games, slots, and classic casino favorites. Spinora provides fast Vblink account creation, deposit bonuses, and dedicated support so you can focus on winning.",
     players: 17435,
     gradient: "from-cyan-400 via-sky-600 to-blue-900",
-    trending: true,
-    promotional: true,
+    upcoming: true,
   },
   {
     id: "9",
@@ -198,8 +196,7 @@ export const GAMES: Game[] = [
     bio: "Ultrapanda is a vibrant fish and slots platform featuring the beloved panda mascot and action-packed gameplay. Download Ultrapanda through Spinora, create your account, and enjoy welcome bonuses with fast deposits and 24/7 player support.",
     players: 16320,
     gradient: "from-red-400 via-rose-500 to-pink-800",
-    trending: true,
-    promotional: true,
+    upcoming: true,
   },
   {
     id: "15",
@@ -253,9 +250,8 @@ export function filterGames(tab: GameTab, search: string): Game[] {
   } else {
     list = list.filter((g) => !g.upcoming);
     if (tab === "popular") list = list.filter((g) => g.popular);
-    if (tab === "trending") list = list.filter((g) => g.trending);
-    if (tab === "promotional") list = list.filter((g) => g.promotional);
     if (tab === "topRated") list = list.filter((g) => g.topRated);
+    // trending & promotional tabs list every live game
   }
 
   if (search.trim()) {
@@ -272,12 +268,21 @@ export function filterGames(tab: GameTab, search: string): Game[] {
 }
 
 export function filterHomeGames(tab: HomeGameTab, search: string): Game[] {
-  const map: Record<HomeGameTab, GameTab> = {
-    trending: "trending",
-    all: "all",
-    promotional: "promotional",
-  };
-  return filterGames(map[tab], search);
+  // Home trending & promotional tabs show every live game (non-upcoming).
+  if (tab === "trending" || tab === "promotional") {
+    let list = GAMES.filter((g) => !g.upcoming).sort((a, b) => b.players - a.players);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (g) =>
+          g.name.toLowerCase().includes(q) ||
+          g.provider.toLowerCase().includes(q) ||
+          g.bio.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+  return filterGames("all", search);
 }
 
 export function formatPlayers(n: number) {
