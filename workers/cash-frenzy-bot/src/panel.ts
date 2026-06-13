@@ -173,7 +173,16 @@ async function clickNewAccount(page: Page): Promise<void> {
   await page.bringToFront().catch(() => {});
   await page.waitForTimeout(600);
 
-  for (const frame of page.frames()) {
+  const main = page.mainFrame();
+  const ordered = [
+    main,
+    ...page.frames().filter((f) => f !== main && !/\/player\//i.test(f.url())),
+    ...page.frames().filter((f) => /\/player\//i.test(f.url())),
+  ];
+  const tried = new Set<Frame>();
+  for (const frame of ordered) {
+    if (tried.has(frame)) continue;
+    tried.add(frame);
     if (await clickNewAccountInFrame(page, frame)) {
       log("create", `clicked New Account (${frame.url() || "main"})`);
       return;
@@ -235,23 +244,28 @@ async function ensureUserList(page: Page): Promise<void> {
   throw new Error("Not logged in on /admin. Open User List in bot Chrome, then retry.");
 }
 
-async function waitForCreateDialog(page: Page, timeoutMs = 12000): Promise<boolean> {
+async function waitForCreateDialog(page: Page, timeoutMs = 18000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     for (const frame of page.frames()) {
       const found = await frame
         .evaluate(() => {
-          const dialogs = [...document.querySelectorAll(".el-dialog")];
-          return dialogs.some((d) => {
-            const hidden = d.closest(".el-overlay")?.getAttribute("style")?.includes("display: none");
-            if (hidden) return false;
-            return d.querySelector('input[type="password"]') !== null;
-          });
+          const visible = (el: Element) => {
+            const rect = el.getBoundingClientRect();
+            return rect.width > 20 && rect.height > 20;
+          };
+          for (const dlg of document.querySelectorAll(".el-dialog")) {
+            if (!visible(dlg)) continue;
+            if (dlg.querySelector('input[type="password"]')) return true;
+            const title = dlg.querySelector(".el-dialog__title, .el-dialog__header")?.textContent ?? "";
+            if (/essential information/i.test(title)) return true;
+          }
+          return false;
         })
         .catch(() => false);
       if (found) return true;
     }
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(400);
   }
   return false;
 }
@@ -266,14 +280,20 @@ async function readDomMessages(page: Page): Promise<string> {
 }
 
 async function createDialogStillOpen(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    for (const overlay of document.querySelectorAll(".el-overlay")) {
-      if (overlay.getAttribute("style")?.includes("display: none")) continue;
-      const dlg = overlay.querySelector(".el-dialog");
-      if (dlg?.querySelector('input[type="password"]')) return true;
-    }
-    return false;
-  });
+  for (const frame of page.frames()) {
+    const open = await frame
+      .evaluate(() => {
+        for (const dlg of document.querySelectorAll(".el-dialog")) {
+          const rect = dlg.getBoundingClientRect();
+          if (rect.width < 20 || rect.height < 20) continue;
+          if (dlg.querySelector('input[type="password"]')) return true;
+        }
+        return false;
+      })
+      .catch(() => false);
+    if (open) return true;
+  }
+  return false;
 }
 
 async function fillAndSaveCreateDialog(page: Page, username: string, password: string): Promise<{ ok: boolean; error?: string }> {
@@ -290,12 +310,17 @@ async function fillAndSaveCreateDialog(page: Page, username: string, password: s
     const norm = (s: string) => s.replace(/\s+/g, " ").replace(/\*/g, "").trim();
 
     const findDialog = (): Element | undefined => {
-      for (const overlay of document.querySelectorAll(".el-overlay")) {
-        if (overlay.getAttribute("style")?.includes("display: none")) continue;
-        const candidate = overlay.querySelector(".el-dialog");
-        if (candidate?.querySelector('input[type="password"]')) return candidate;
+      const visible = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 20 && rect.height > 20;
+      };
+      for (const dlg of document.querySelectorAll(".el-dialog")) {
+        if (!visible(dlg)) continue;
+        if (dlg.querySelector('input[type="password"]')) return dlg;
+        const title = dlg.querySelector(".el-dialog__title, .el-dialog__header")?.textContent ?? "";
+        if (/essential information/i.test(title)) return dlg;
       }
-      return [...document.querySelectorAll(".el-dialog")].find((d) => d.querySelector('input[type="password"]'));
+      return undefined;
     };
 
     const inputByLabel = (dlg: Element, pattern: RegExp): HTMLInputElement | null => {
@@ -574,12 +599,13 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   await clickNewAccount(page);
   log("create", `opening create dialog for ${username}`);
 
+  await page.waitForTimeout(1200);
+
   if (!(await waitForCreateDialog(page))) {
-    await screenshot(page, "create-dialog-missing");
-    return { status: "error", message: "Create dialog did not open after New Account click" };
+    log("create", "dialog wait timed out — attempting fill anyway");
   }
 
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(600);
 
   const filled = await fillAndSaveCreateDialog(page, username, password);
   if (!filled.ok) {
