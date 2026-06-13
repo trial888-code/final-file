@@ -37,6 +37,7 @@ export const AUTOMATED_GAME_SLUGS = [
   "cash-machine",
   "mr-all-in-one",
   "mafia",
+  "cash-frenzy",
 ] as const;
 export type AutomatedGameSlug = (typeof AUTOMATED_GAME_SLUGS)[number];
 

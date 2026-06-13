@@ -22,6 +22,14 @@ export function getGameVaultAdminPanelUrl(): string | null {
   return process.env.GAMEVAULT_ADMIN_URL?.trim() || "https://agent.gamevault999.com/login";
 }
 
+/**
+ * Cash Frenzy agent panel URL. Same Element Plus backend as Game Vault.
+ * Defaults to the public login page; override with CASHFRENZY_ADMIN_URL.
+ */
+export function getCashFrenzyAdminPanelUrl(): string | null {
+  return process.env.CASHFRENZY_ADMIN_URL?.trim() || "https://agentserver.cashfrenzy777.com/admin/login";
+}
+
 /** Layui MDI panels (same software family as Gameroom). */
 export function getGameroomAdminPanelUrl(): string | null {
   return process.env.GAMEROOM_ADMIN_URL?.trim() || "https://agentserver1.gameroom777.com/admin/login";
