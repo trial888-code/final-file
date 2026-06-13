@@ -79,11 +79,23 @@ async function closeOverlays(page: Page): Promise<void> {
   }
 }
 
+async function typeIntoViaDom(input: Locator, value: string): Promise<void> {
+  await input.evaluate((el, val) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(el, val);
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, data: val, inputType: "insertText" }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
 async function typeInto(input: Locator, value: string): Promise<void> {
-  await input.waitFor({ state: "visible", timeout: 10000 });
-  await input.click();
-  await input.fill("");
-  await input.pressSequentially(value, { delay: 25 });
+  if (await input.isVisible().catch(() => false)) {
+    await input.click();
+    await input.fill("");
+    await input.pressSequentially(value, { delay: 25 });
+    return;
+  }
+  await typeIntoViaDom(input, value);
 }
 
 async function clickDialogButton(dlg: Locator, pattern: RegExp): Promise<void> {
@@ -228,17 +240,42 @@ function listTable(page: Page): Locator {
   return withAccount.first().or(page.locator(".el-table").first());
 }
 
+async function searchAccountViaDom(page: Page, account: string): Promise<boolean> {
+  return page.evaluate((term) => {
+    const inputs = [
+      ...document.querySelectorAll('input.el-input__inner, input[type="text"], input:not([type="password"]):not([type="hidden"])'),
+    ];
+    const search = inputs.find((el) => /search|please enter/i.test(el.getAttribute("placeholder") ?? ""));
+    if (!search) return false;
+
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(search, term);
+    search.dispatchEvent(new InputEvent("input", { bubbles: true, data: term, inputType: "insertText" }));
+    search.dispatchEvent(new Event("change", { bubbles: true }));
+
+    const btn = [...document.querySelectorAll("button, .el-button")].find((el) =>
+      /^\s*search\s*$/i.test(el.textContent ?? "")
+    );
+    (btn as HTMLElement | undefined)?.click();
+    return true;
+  }, account);
+}
+
 async function searchAccount(page: Page, account: string): Promise<void> {
   await ensureUserList(page);
   const search = searchInput(page);
-  await search.waitFor({ state: "visible", timeout: 15000 });
-  await search.click();
-  await search.fill("");
-  await search.fill(account);
-
-  const btn = page.getByRole("button", { name: /^\s*search\s*$/i }).first();
-  if (await btn.isVisible().catch(() => false)) await btn.click();
-  else await search.press("Enter");
+  if (await search.isVisible().catch(() => false)) {
+    await search.click();
+    await search.fill("");
+    await search.fill(account);
+    const btn = page.getByRole("button", { name: /^\s*search\s*$/i }).first();
+    if (await btn.isVisible().catch(() => false)) await btn.click();
+    else await search.press("Enter");
+  } else if (await searchAccountViaDom(page, account)) {
+    log("search", `searched "${account}" via DOM`);
+  } else {
+    throw new Error(`Could not find search input for account "${account}"`);
+  }
   await page.waitForTimeout(1800);
 }
 
@@ -390,7 +427,7 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   await page.waitForTimeout(1000);
 
   const dlg = visibleDialog(page);
-  await dlg.waitFor({ state: "visible", timeout: 10000 });
+  await dlg.waitFor({ state: "attached", timeout: 10000 });
 
   const textInputs = dlg.locator('input.el-input__inner:not([type="password"])');
   const passInputs = dlg.locator('input[type="password"]');
@@ -399,7 +436,21 @@ async function tryCreateOnce(page: Page, username: string, password: string): Pr
   await typeInto(passInputs.nth(0), password);
   await typeInto(passInputs.nth(1), password);
 
-  await clickDialogButton(dlg, /^\s*save\s*$/i);
+  await clickDialogButton(dlg, /^\s*save\s*$/i).catch(async () => {
+    const saved = await page.evaluate(() => {
+      const dlgEl = [...document.querySelectorAll(".el-dialog")].find((d) =>
+        /essential information/i.test(d.textContent ?? "")
+      );
+      const btn = dlgEl
+        ? [...dlgEl.querySelectorAll("button, .el-button")].find((b) => /^\s*save\s*$/i.test(b.textContent ?? ""))
+        : undefined;
+      if (!btn) return false;
+      (btn as HTMLElement).click();
+      return true;
+    });
+    if (!saved) throw new Error("Save button not found in create dialog");
+    log("create", "clicked Save via DOM");
+  });
   await page.waitForTimeout(2000);
 
   const messages = await readPanelMessages(page);
@@ -432,11 +483,7 @@ export async function createAccount(
   for (let attempt = 0; attempt < 20; attempt++) {
     const username = variant(baseUsername, attempt);
 
-    if (await accountExists(page, username)) {
-      log("create", `"${username}" already exists — trying next variant`);
-      continue;
-    }
-
+    // Skip pre-search — CDP often can't see the search box; duplicates handled in tryCreateOnce.
     const outcome = await tryCreateOnce(page, username, password);
     if (outcome.status === "created") {
       log("create", `created ${username}`);
