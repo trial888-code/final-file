@@ -7,37 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
 import { walletTypeLabel, type WalletType } from "@/lib/wallet/types";
+import type { AdminTransactionRow } from "@/lib/actions/wallet";
 import {
   formatTransactionAmount,
   transactionSourceLabel,
   transactionSummary,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
-import { Search } from "lucide-react";
+import { Search, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-export interface AdminTransactionRow {
-  id: string;
-  amount: number;
-  wallet_type: string;
-  transaction_type: string;
-  source: string;
-  description: string | null;
-  created_at: string;
-  user: {
-    id: string;
-    full_name: string | null;
-    email: string;
-  } | null;
-}
 
 interface AdminTransactionsListProps {
   transactions: AdminTransactionRow[];
+  live?: boolean;
+  totalStored?: number;
 }
 
 type WalletFilter = "all" | WalletType;
-
-const PAGE_SIZE = 40;
 
 const FILTER_OPTIONS: { id: WalletFilter; label: string }[] = [
   { id: "all", label: "All wallets" },
@@ -47,10 +33,13 @@ const FILTER_OPTIONS: { id: WalletFilter; label: string }[] = [
   { id: "cashout", label: "Deposit Redeem" },
 ];
 
-export function AdminTransactionsList({ transactions }: AdminTransactionsListProps) {
+export function AdminTransactionsList({
+  transactions,
+  live = false,
+  totalStored,
+}: AdminTransactionsListProps) {
   const [query, setQuery] = useState("");
   const [walletFilter, setWalletFilter] = useState<WalletFilter>("bonus");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -71,9 +60,6 @@ export function AdminTransactionsList({ transactions }: AdminTransactionsListPro
     });
   }, [transactions, query, walletFilter]);
 
-  const visible = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
-
   const bonusCount = useMemo(
     () => transactions.filter((t) => t.wallet_type === "bonus").length,
     [transactions]
@@ -88,7 +74,6 @@ export function AdminTransactionsList({ transactions }: AdminTransactionsListPro
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setVisibleCount(PAGE_SIZE);
             }}
             placeholder="Search by user, email, game, or description..."
             className="pl-9"
@@ -105,7 +90,6 @@ export function AdminTransactionsList({ transactions }: AdminTransactionsListPro
             variant={walletFilter === opt.id ? "default" : "outline"}
             onClick={() => {
               setWalletFilter(opt.id);
-              setVisibleCount(PAGE_SIZE);
             }}
           >
             {opt.label}
@@ -116,13 +100,22 @@ export function AdminTransactionsList({ transactions }: AdminTransactionsListPro
         ))}
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {filtered.length} transaction{filtered.length === 1 ? "" : "s"}
-        {query.trim() ? " found" : walletFilter === "bonus" ? " · bonus wallet loads & credits" : ""}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="text-sm text-muted-foreground">
+          Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"}
+          {totalStored != null ? ` · ${totalStored} stored in database` : ""}
+          {query.trim() ? " (filtered)" : walletFilter === "bonus" ? " · bonus wallet" : ""}
+        </p>
+        {live && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">
+            <Radio className="h-3 w-3 animate-pulse" />
+            Live — new transactions appear automatically
+          </span>
+        )}
+      </div>
 
       <div className="space-y-3">
-        {visible.map((row) => {
+        {filtered.map((row) => {
           const user = row.user;
           const tx = row as WalletTransactionRow;
           const isDebit = row.transaction_type === "debit";
@@ -177,16 +170,6 @@ export function AdminTransactionsList({ transactions }: AdminTransactionsListPro
           </Card>
         )}
 
-        {hasMore && (
-          <div className="flex justify-center pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-            >
-              Load more ({filtered.length - visibleCount} remaining)
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );

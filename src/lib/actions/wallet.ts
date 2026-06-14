@@ -93,6 +93,7 @@ export async function creditUserWallet(
   revalidatePath("/spin");
   revalidatePath("/");
   revalidatePath("/admin/users");
+  revalidatePath("/admin/transactions");
 
   return { success: true };
 }
@@ -125,6 +126,84 @@ export async function getWalletTransactions(userId?: string, limit = 10) {
   return data || [];
 }
 
+export interface AdminTransactionRow {
+  id: string;
+  amount: number;
+  wallet_type: string;
+  transaction_type: string;
+  source: string;
+  description: string | null;
+  created_at: string;
+  user: {
+    id: string;
+    full_name: string | null;
+    email: string;
+  } | null;
+}
+
+const ADMIN_TX_SELECT =
+  "id, amount, wallet_type, transaction_type, source, description, created_at, user_id";
+
+async function attachProfilesToTransactions(
+  supabase: NonNullable<Awaited<ReturnType<typeof requireAdmin>>["supabase"]>,
+  rows: Array<Record<string, unknown>>
+): Promise<AdminTransactionRow[]> {
+  if (!rows.length) return [];
+
+  const userIds = [...new Set(rows.map((r) => String(r.user_id)))];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", userIds);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    amount: Number(row.amount),
+    wallet_type: String(row.wallet_type),
+    transaction_type: String(row.transaction_type),
+    source: String(row.source),
+    description: (row.description as string | null) ?? null,
+    created_at: String(row.created_at),
+    user: profileMap.get(String(row.user_id)) ?? null,
+  }));
+}
+
+/** Fetch every stored wallet transaction for admin (paginated server-side). */
+export async function getAdminAllTransactions(): Promise<
+  { transactions: AdminTransactionRow[] } | { error: string }
+> {
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+
+  const BATCH = 1000;
+  const rows: Array<Record<string, unknown>> = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await auth.supabase!
+      .from("wallet_transactions")
+      .select(ADMIN_TX_SELECT)
+      .order("created_at", { ascending: false })
+      .range(from, from + BATCH - 1);
+
+    if (error) {
+      if (error.message.includes("wallet_transactions")) {
+        return { error: "Run supabase/wallets.sql in Supabase." };
+      }
+      return { error: error.message };
+    }
+    if (!data?.length) break;
+    rows.push(...(data as Array<Record<string, unknown>>));
+    if (data.length < BATCH) break;
+    from += BATCH;
+  }
+
+  const transactions = await attachProfilesToTransactions(auth.supabase!, rows);
+  return { transactions };
+}
+
 export interface AdminUserBonusActivity {
   transactions: Array<{
     id: string;
@@ -152,21 +231,38 @@ export interface AdminUserBonusActivity {
 
 /** Bonus-wallet debits/credits and bonus-side game jobs for admin user review. */
 export async function getAdminUserBonusActivity(
-  userId: string,
-  limit = 50
+  userId: string
 ): Promise<AdminUserBonusActivity | { error: string }> {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
 
-  const [txRes, loadsRes] = await Promise.all([
-    auth.supabase!
+  const BATCH = 1000;
+  const txRows: Array<Record<string, unknown>> = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await auth.supabase!
       .from("wallet_transactions")
       .select("id, amount, wallet_type, transaction_type, source, description, created_at")
       .eq("user_id", userId)
       .in("wallet_type", ["bonus", "bonus_redeem"])
       .order("created_at", { ascending: false })
-      .limit(limit),
-    auth.supabase!
+      .range(from, from + BATCH - 1);
+
+    if (error?.message.includes("wallet_transactions")) {
+      return { error: "Run supabase/wallets.sql in Supabase." };
+    }
+    if (error) return { error: error.message };
+    if (!data?.length) break;
+    txRows.push(...data);
+    if (data.length < BATCH) break;
+    from += BATCH;
+  }
+
+  const loadRows: AdminUserBonusActivity["gameLoads"] = [];
+  from = 0;
+  while (true) {
+    const { data, error } = await auth.supabase!
       .from("game_load_requests")
       .select(
         "id, game_name, game_slug, amount, load_type, status, game_username, redeem_all, created_at, completed_at, error_message"
@@ -174,19 +270,21 @@ export async function getAdminUserBonusActivity(
       .eq("user_id", userId)
       .eq("wallet_type", "bonus")
       .order("created_at", { ascending: false })
-      .limit(limit),
-  ]);
+      .range(from, from + BATCH - 1);
 
-  if (txRes.error?.message.includes("wallet_transactions")) {
-    return { error: "Run supabase/wallets.sql in Supabase." };
-  }
-  if (loadsRes.error?.message.includes("game_load_requests")) {
-    return { error: "Run supabase/game-load-requests.sql in Supabase." };
+    if (error?.message.includes("game_load_requests")) {
+      return { error: "Run supabase/game-load-requests.sql in Supabase." };
+    }
+    if (error) return { error: error.message };
+    if (!data?.length) break;
+    loadRows.push(...data);
+    if (data.length < BATCH) break;
+    from += BATCH;
   }
 
   return {
-    transactions: txRes.data ?? [],
-    gameLoads: loadsRes.data ?? [],
+    transactions: txRows as AdminUserBonusActivity["transactions"],
+    gameLoads: loadRows,
   };
 }
 
@@ -251,6 +349,7 @@ function revalidateWalletPaths() {
   revalidatePath("/spin");
   revalidatePath("/");
   revalidatePath("/admin/users");
+  revalidatePath("/admin/transactions");
 }
 
 export async function adminDeductWallet(
