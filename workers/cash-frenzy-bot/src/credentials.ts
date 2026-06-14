@@ -1,7 +1,13 @@
 /**
- * Cash Frenzy account names: letters/numbers, 20 chars or fewer (panel rule).
+ * Cash Frenzy account names: letters/numbers, 7–20 chars (panel rule).
  * Password defaults to the username unless the user picked one.
  */
+import {
+  ensureMinUsername,
+  MIN_ACCOUNT_USERNAME_LEN,
+} from "../../shared/numbered-credentials.js";
+
+const MIN_LEN = MIN_ACCOUNT_USERNAME_LEN;
 const MAX_LEN = 20;
 
 function cleanAccount(raw: string): string {
@@ -11,13 +17,14 @@ function cleanAccount(raw: string): string {
 /** Panel accepts letters and numbers only in passwords. */
 export function cleanPassword(raw: string, fallback: string): string {
   const p = raw.replace(/[^a-zA-Z0-9]/g, "").slice(0, MAX_LEN);
-  if (p.length >= 6) return p;
+  if (p.length >= MIN_LEN) return p;
   return cleanAccount(fallback) || "player1";
 }
 
 export function normalizeUsername(raw: string): string {
-  return cleanAccount(raw);
+  return ensureMinUsername(cleanAccount(raw), MIN_LEN, MAX_LEN);
 }
+
 export function buildCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
@@ -43,9 +50,7 @@ export function buildCredentials(profile: {
     }
   }
 
-  if (!base) base = "player";
-
-  const username = cleanAccount(base || "player");
+  const username = normalizeUsername(base || "player");
   return { username, password: cleanPassword(username, username) };
 }
 
@@ -57,7 +62,7 @@ function randomSuffix(len: number): string {
 }
 
 export function usernameVariant(base: string, attempt: number): string {
-  const clean = cleanAccount(base) || "player";
+  const clean = normalizeUsername(base);
   if (attempt <= 0) return clean;
 
   let suffix: string;
@@ -65,5 +70,5 @@ export function usernameVariant(base: string, attempt: number): string {
   else suffix = randomSuffix(attempt <= 5 ? 2 : 3);
 
   const room = MAX_LEN - suffix.length;
-  return `${clean.slice(0, Math.max(1, room))}${suffix}`;
+  return normalizeUsername(`${clean.slice(0, Math.max(1, room))}${suffix}`);
 }

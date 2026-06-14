@@ -27,7 +27,7 @@ export async function runJob(job: GameLoadJob): Promise<BotResult> {
         page,
         plan.stem,
         plan.preferredPassword ?? "",
-        variantFromPlan(plan),
+        variantFromPlan(plan, 20),
         { forceNewAccount: plan.forceNewAccount }
       );
       return { username: creds.username, password: creds.username };

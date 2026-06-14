@@ -37,6 +37,8 @@ echo   Then run:  start-all-bots-unified.bat
 echo ============================================================
 echo.
 
+node "%~dp0scripts\patch-chrome-prefs.mjs" "%PROFILE%" 2>nul
+
 curl.exe -s -o nul -w "%%{http_code}" %CDP%/json/version 2>nul | findstr /r "^200$" >nul
 if errorlevel 1 (
   echo   Starting unified Chrome on port %PORT%...
@@ -57,6 +59,9 @@ if errorlevel 1 (
 )
 
 :port_ready
+echo.
+echo   Disabling Chrome password breach popups for bot profile...
+node "%~dp0scripts\patch-chrome-prefs.mjs" "%PROFILE%" 2>nul
 echo.
 echo   Opening all 8 panel tabs (Juwa + Vegas Sweeps + 6 others)...
 echo.

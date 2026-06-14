@@ -1,5 +1,5 @@
 import type { Frame, Locator, Page } from "playwright";
-import { passwordForAccount } from "./credentials.js";
+import { normalizeUsername, passwordForAccount } from "./credentials.js";
 import { isLoginPage, log, parseMoney, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 /**
@@ -659,7 +659,7 @@ export async function createAccount(
   options?: { forceNewAccount?: boolean }
 ): Promise<{ username: string; password: string }> {
   for (let attempt = 0; attempt < 8; attempt++) {
-    const username = variant(baseUsername, attempt);
+    const username = normalizeUsername(variant(baseUsername, attempt));
     const pwd = passwordForAccount(username, password);
 
     if (await accountExists(page, username)) {

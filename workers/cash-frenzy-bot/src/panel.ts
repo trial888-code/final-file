@@ -1,4 +1,5 @@
 import type { Frame, Locator, Page } from "playwright";
+import { normalizeUsername } from "./credentials.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL =
@@ -1056,7 +1057,7 @@ export async function createAccount(
   options?: { forceNewAccount?: boolean }
 ): Promise<{ username: string; password: string }> {
   for (let attempt = 0; attempt < 20; attempt++) {
-    const username = variant(baseUsername, attempt);
+    const username = normalizeUsername(variant(baseUsername, attempt));
 
     if (await accountExists(page, username)) {
       log("create", `"${username}" already exists — trying next number`);

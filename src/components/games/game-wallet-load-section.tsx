@@ -31,6 +31,13 @@ import type { GameLoadRequest } from "@/lib/game-automation/types";
 import { isAutomatedGameSlug, AUTOMATED_BOT_WORKER_DIR } from "@/lib/game-automation/types";
 import { isGameAccountCreateLoadType } from "@/lib/game-automation/account-create";
 import { WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
+import {
+  ensureGameAccountUsername,
+  GAME_ACCOUNT_PASSWORD_MIN,
+  GAME_ACCOUNT_PASSWORD_MAX,
+  isLayuiPanelGame,
+  maxUsernameLenForGame,
+} from "@/lib/game-automation/account-username";
 import { previewJuwaUsername } from "@/lib/game-automation/juwa-credentials";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -39,13 +46,6 @@ import { WALLET_REFRESH_EVENT } from "@/lib/wallet/use-live-wallet";
 interface GameWalletLoadSectionProps {
   game: Game;
   onAccountChange?: (hasAccount: boolean) => void;
-}
-
-/** Layui agent panels (Gameroom family) — stricter username/password rules. */
-const LAYUI_PANEL_SLUGS = ["gameroom", "cash-machine", "mr-all-in-one", "mafia"] as const;
-
-function isLayuiPanelGame(slug: string): boolean {
-  return (LAYUI_PANEL_SLUGS as readonly string[]).includes(slug);
 }
 
 export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadSectionProps) {
@@ -330,28 +330,35 @@ export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadS
       toast.error("Username: letters, numbers, and underscores only");
       return;
     }
+    const maxLen = maxUsernameLenForGame(game.slug);
+    if (username.length > maxLen) {
+      toast.error(`Username must be at most ${maxLen} characters`);
+      return;
+    }
+    const normalizedUsername = ensureGameAccountUsername(username, game.slug);
     if (isLayuiPanelGame(game.slug)) {
-      if (username.length < 6 || username.length > 13) {
-        toast.error("Username must be 6–13 characters for this game");
-        return;
-      }
       const layuiPassword = password.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-      if (layuiPassword.length < 6 || layuiPassword.length > 13) {
-        toast.error("Password must be 6–13 letters and numbers only (no symbols)");
+      if (
+        layuiPassword.length < GAME_ACCOUNT_PASSWORD_MIN ||
+        layuiPassword.length > GAME_ACCOUNT_PASSWORD_MAX
+      ) {
+        toast.error(
+          `Password must be ${GAME_ACCOUNT_PASSWORD_MIN}–${GAME_ACCOUNT_PASSWORD_MAX} letters and numbers only (no symbols)`
+        );
         return;
       }
       if (!/[a-z]/.test(layuiPassword) || !/[0-9]/.test(layuiPassword)) {
         toast.error("Password must include both letters and numbers (e.g. player1)");
         return;
       }
-      await handleCreateAccount({ username: username.toLowerCase(), password: layuiPassword });
+      await handleCreateAccount({ username: normalizedUsername, password: layuiPassword });
       return;
     }
     if (password.length < 4) {
       toast.error("Password must be at least 4 characters");
       return;
     }
-    await handleCreateAccount({ username, password });
+    await handleCreateAccount({ username: normalizedUsername, password });
   }
 
   async function handleCheckBalance() {

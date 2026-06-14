@@ -1,21 +1,22 @@
 /**
  * Mafia panel rules:
- * - Username: letters, numbers, underscore, 6–13 chars
- * - Password: letters and numbers ONLY (no underscore/symbols), 6–13 chars
+ * - Username: letters, numbers, underscore, 7–13 chars
+ * - Password: letters and numbers ONLY (no underscore/symbols), 7–13 chars
  */
-const MIN_LEN = 6;
-const MAX_LEN = 13;
+import {
+  ensureMinUsername,
+  MIN_ACCOUNT_USERNAME_LEN,
+  DEFAULT_MAX_LEN,
+} from "../../shared/numbered-credentials.js";
 
-function cleanUsername(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9_]/g, "");
-}
+const MIN_LEN = MIN_ACCOUNT_USERNAME_LEN;
+const MAX_LEN = DEFAULT_MAX_LEN;
 
-/** Password must be alphanumeric only — panel rejects underscores and symbols. */
 function cleanPassword(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/** Mafia rejects letter-only or digit-only passwords — must include both. */
+/** Panel rejects letter-only or digit-only passwords — must include both. */
 function finalizePassword(raw: string): string {
   let p = cleanPassword(raw);
   if (p.length < MIN_LEN) p = `${p}123456789`.slice(0, MAX_LEN);
@@ -26,22 +27,11 @@ function finalizePassword(raw: string): string {
   return p.slice(0, MAX_LEN);
 }
 
-function padPassword(base: string): string {
-  return finalizePassword(base);
-}
-
-/** Pad or trim so the panel accepts the value (6–13 chars). */
 export function normalizeUsername(raw: string): string {
-  let u = cleanUsername(raw).slice(0, MAX_LEN);
-  if (!u) u = "player";
-  if (u.length < MIN_LEN) {
-    u = `${u}123456`.slice(0, MAX_LEN);
-    if (u.length < MIN_LEN) u = "player1";
-  }
-  return u;
+  return ensureMinUsername(raw, MIN_LEN, MAX_LEN);
 }
 
-/** Password for a given login name — always 6–13 alphanumeric chars with letters AND digits. */
+/** Password for a given login name — 7–13 alphanumeric chars with letters AND digits. */
 export function passwordForAccount(username: string, preferred?: string): string {
   const fallback = finalizePassword(`${cleanPassword(username) || "player"}1`);
   if (!preferred?.trim()) return fallback;
@@ -55,28 +45,7 @@ export function buildCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
 }): { username: string; password: string } {
-  let base = "";
-
-  if (profile.full_name?.trim()) {
-    const parts = profile.full_name.trim().split(/\s+/);
-    base = parts[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (base.length < 3 && parts.length > 1) {
-      base = parts
-        .join("_")
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, "")
-        .replace(/_+/g, "_");
-    }
-  }
-
-  if (!base && profile.email) {
-    const local = profile.email.split("@")[0] ?? "";
-    if (!local.endsWith("@phone.spinora.local")) {
-      base = local.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    }
-  }
-
-  const username = normalizeUsername(base || "player");
+  const username = normalizeUsername(profile.full_name?.trim() || profile.email || "player");
   return { username, password: passwordForAccount(username) };
 }
 

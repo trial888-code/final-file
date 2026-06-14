@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { getJuwaAdminPanelUrl, getVegasAdminPanelUrl, getGameVaultAdminPanelUrl, getCashFrenzyAdminPanelUrl, isWalletLoadEnabledForGame, WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
+import { ensureGameAccountUsername, maxUsernameLenForGame } from "@/lib/game-automation/account-username";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
 
 export async function requestGameAccountCreate(input: {
@@ -45,20 +46,27 @@ export async function requestGameAccountCreate(input: {
     return { error: "No account to replace yet. Create your first account instead." };
   }
 
-  const username = input.username?.trim() || undefined;
+  const rawUsername = input.username?.trim() || undefined;
   const password = input.password?.trim() || undefined;
 
-  if (username || password) {
-    if (!username || username.length < 3) {
+  if (rawUsername || password) {
+    if (!rawUsername || rawUsername.length < 3) {
       return { error: "Username must be at least 3 characters." };
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(rawUsername)) {
       return { error: "Username can only contain letters, numbers, and underscores." };
+    }
+    if (rawUsername.length > maxUsernameLenForGame(input.gameSlug)) {
+      return { error: `Username must be at most ${maxUsernameLenForGame(input.gameSlug)} characters.` };
     }
     if (!password || password.length < 4) {
       return { error: "Password must be at least 4 characters." };
     }
   }
+
+  const username = rawUsername
+    ? ensureGameAccountUsername(rawUsername, input.gameSlug)
+    : undefined;
 
   const { data: pending } = await supabase
     .from("game_load_requests")

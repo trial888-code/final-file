@@ -1,8 +1,9 @@
-/** Juwa: ≤13 chars, letters/underscore/numbers. Password matches account. */
-export function buildJuwaCredentials(profile: {
+import { ensureGameAccountUsername } from "./account-username";
+
+function profileNameStem(profile: {
   full_name?: string | null;
   email?: string | null;
-}): { username: string; password: string } {
+}): string {
   let base = "";
 
   if (profile.full_name?.trim()) {
@@ -26,10 +27,18 @@ export function buildJuwaCredentials(profile: {
 
   if (!base) base = "player";
 
-  const username = base.replace(/[^a-z0-9_]/g, "").slice(0, 13);
+  return base.replace(/[^a-z0-9_]/g, "").slice(0, 13);
+}
+
+/** Juwa: ≤13 chars, letters/underscore/numbers. Password matches account. */
+export function buildJuwaCredentials(profile: {
+  full_name?: string | null;
+  email?: string | null;
+}): { username: string; password: string } {
+  const username = ensureGameAccountUsername(profileNameStem(profile), "juwa");
   return { username, password: username };
 }
 
 export function previewJuwaUsername(fullName?: string | null, email?: string | null): string {
-  return buildJuwaCredentials({ full_name: fullName, email }).username;
+  return ensureGameAccountUsername(profileNameStem({ full_name: fullName, email }), "juwa");
 }
