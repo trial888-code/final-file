@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Users, Gamepad2, MessageSquare, TrendingUp, Star, Target } from "lucide-react";
+import { Users, MessageSquare, Star, Target, Banknote, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AdminBroadcastNotice } from "@/components/admin/admin-broadcast-notice";
@@ -10,15 +10,19 @@ export default async function AdminPage() {
 
   const [
     { count: userCount },
-    { count: requestCount },
-    { count: pendingCount },
+    { count: pendingLoads },
+    { count: transactionCount },
     { count: conversationCount },
     { count: reviewCount },
     { count: pendingTasks },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("game_requests").select("*", { count: "exact", head: true }),
-    supabase.from("game_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("game_load_requests")
+      .select("*", { count: "exact", head: true })
+      .in("load_type", ["load", "reload", "redeem"])
+      .in("status", ["pending", "processing"]),
+    supabase.from("wallet_transactions").select("*", { count: "exact", head: true }),
     supabase.from("conversations").select("*", { count: "exact", head: true }).eq("is_active", true),
     supabase.from("reviews").select("*", { count: "exact", head: true }),
     supabase.from("user_task_submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
@@ -26,12 +30,17 @@ export default async function AdminPage() {
 
   const stats = [
     { icon: Users, label: "Total Users", value: userCount || 0, href: "/admin/users" },
-    { icon: Gamepad2, label: "Game Requests", value: requestCount || 0, href: "/admin/requests" },
     {
-      icon: TrendingUp,
-      label: "Pending Requests",
-      value: pendingCount || 0,
-      href: "/admin/requests?status=pending",
+      icon: Banknote,
+      label: "Wallet Loads",
+      value: pendingLoads || 0,
+      href: "/admin/game-loads",
+    },
+    {
+      icon: History,
+      label: "Transactions",
+      value: transactionCount || 0,
+      href: "/admin/transactions",
     },
     { icon: MessageSquare, label: "Active Chats", value: conversationCount || 0, href: "/admin/chat" },
     { icon: Star, label: "Reviews", value: reviewCount || 0, href: "/admin/reviews" },
@@ -50,7 +59,7 @@ export default async function AdminPage() {
           <Link href="/admin/chat">Open Customer Chat</Link>
         </Button>
         <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/requests">Manage Requests</Link>
+          <Link href="/admin/game-loads">Wallet Loads</Link>
         </Button>
         <Button variant="outline" asChild className="w-full sm:w-auto">
           <Link href="/admin/users">Manage Users</Link>

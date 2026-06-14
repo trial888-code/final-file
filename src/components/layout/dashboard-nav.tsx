@@ -55,7 +55,6 @@ const adminLinks = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/transactions", label: "Transactions", icon: History },
   { href: "/admin/game-loads", label: "Wallet Loads", icon: Banknote },
-  { href: "/admin/requests", label: "Game Requests", icon: Gamepad2 },
   { href: "/admin/deposits", label: "Deposits", icon: Banknote },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/reviews", label: "Reviews", icon: Star },

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
+import { notifyAdminOfWalletActivity } from "@/lib/telegram/notify-admin-wallet-activity";
 import { getJuwaAdminPanelUrl, getVegasAdminPanelUrl, getGameVaultAdminPanelUrl, getCashFrenzyAdminPanelUrl, isWalletLoadEnabledForGame, WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
 import { ensureGameAccountUsername, maxUsernameLenForGame } from "@/lib/game-automation/account-username";
 import type { GameLoadWalletType } from "@/lib/game-automation/types";
@@ -103,6 +104,15 @@ export async function requestGameAccountCreate(input: {
 
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/admin/game-loads");
+
+  await notifyAdminOfWalletActivity({
+    userId: user.id,
+    gameName: input.gameName,
+    gameSlug: input.gameSlug,
+    kind: "create_account",
+    requestId: requestId as string,
+  });
+
   return { success: true, requestId: requestId as string };
 }
 
@@ -215,6 +225,16 @@ export async function requestGameLoad(input: {
   revalidatePath("/dashboard");
   revalidatePath("/admin/game-loads");
 
+  await notifyAdminOfWalletActivity({
+    userId: user.id,
+    gameName: input.gameName,
+    gameSlug: input.gameSlug,
+    kind: "load",
+    amount,
+    walletType: input.walletType,
+    requestId: requestId as string,
+  });
+
   return { success: true, requestId: requestId as string };
 }
 
@@ -282,6 +302,17 @@ export async function requestGameRedeem(input: {
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/dashboard");
   revalidatePath("/admin/game-loads");
+
+  await notifyAdminOfWalletActivity({
+    userId: user.id,
+    gameName: input.gameName,
+    gameSlug: input.gameSlug,
+    kind: "redeem",
+    amount: redeemAll ? null : input.amount,
+    walletType: input.walletType ?? "current",
+    redeemAll,
+    requestId: requestId as string,
+  });
 
   return { success: true, requestId: requestId as string };
 }
