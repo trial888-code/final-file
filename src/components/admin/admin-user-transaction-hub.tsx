@@ -11,6 +11,7 @@ import {
   transactionSourceLabel,
   transactionSummary,
   categorizeAdminTransactionPanel,
+  walletColumnSummaryStats,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
@@ -26,12 +27,6 @@ interface AdminUserTransactionHubProps {
   users: AdminTransactionUser[];
   transactions: AdminTransactionRow[];
   live?: boolean;
-}
-
-function sumAmounts(rows: AdminTransactionRow[], type: "debit" | "credit") {
-  return rows
-    .filter((r) => r.transaction_type === type)
-    .reduce((sum, r) => sum + Number(r.amount), 0);
 }
 
 function TransactionEntry({ row, compact }: { row: AdminTransactionRow; compact?: boolean }) {
@@ -79,8 +74,7 @@ function WalletColumn({
   transactions: AdminTransactionRow[];
   emptyHint: string;
 }) {
-  const debits = sumAmounts(transactions, "debit");
-  const credits = sumAmounts(transactions, "credit");
+  const { loadsOut, creditsIn, redeemedBack } = walletColumnSummaryStats(transactions);
 
   return (
     <Card className="flex flex-col min-h-[320px]">
@@ -91,8 +85,13 @@ function WalletColumn({
         </CardTitle>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1">
           <span>{transactions.length} transaction{transactions.length === 1 ? "" : "s"}</span>
-          {debits > 0 && <span className="text-amber-400">Loads out: −${debits.toFixed(2)}</span>}
-          {credits > 0 && <span className="text-emerald-400">Credits in: +${credits.toFixed(2)}</span>}
+          {loadsOut > 0 && <span className="text-amber-400">Loads out: −${loadsOut.toFixed(2)}</span>}
+          {creditsIn > 0 && (
+            <span className="text-emerald-400">Credits in: +${creditsIn.toFixed(2)}</span>
+          )}
+          {redeemedBack > 0 && (
+            <span className="text-sky-400">Redeemed back: +${redeemedBack.toFixed(2)}</span>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto max-h-[520px] pt-0">

@@ -89,3 +89,32 @@ export function gameLoadSummary(load: BonusGameLoadRow): string {
   if (load.load_type === "check_balance") return `Balance check · ${load.game_name}`;
   return `Load $${Number(load.amount).toFixed(2)} · ${load.game_name} (bonus wallet)`;
 }
+
+/** Panel header totals — redeems are returns, not new credits. */
+export function walletColumnSummaryStats(
+  transactions: Array<{ source: string; transaction_type: string; amount: number }>
+) {
+  let loadsOut = 0;
+  let creditsIn = 0;
+  let redeemedBack = 0;
+
+  for (const row of transactions) {
+    const amount = Number(row.amount);
+    if (row.source === "game_load" && row.transaction_type === "debit") {
+      loadsOut += amount;
+      continue;
+    }
+    if (
+      (row.source === "game_redeem" || row.source === "game_load_refund") &&
+      row.transaction_type === "credit"
+    ) {
+      redeemedBack += amount;
+      continue;
+    }
+    if (row.transaction_type === "credit") {
+      creditsIn += amount;
+    }
+  }
+
+  return { loadsOut, creditsIn, redeemedBack };
+}
