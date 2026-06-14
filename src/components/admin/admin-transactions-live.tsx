@@ -3,13 +3,17 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { AdminTransactionRow } from "@/lib/actions/wallet";
-import { AdminTransactionsList } from "@/components/admin/admin-transactions-list";
+import {
+  AdminUserTransactionHub,
+  type AdminTransactionUser,
+} from "@/components/admin/admin-user-transaction-hub";
 
 interface AdminTransactionsLiveProps {
+  users: AdminTransactionUser[];
   initialTransactions: AdminTransactionRow[];
 }
 
-export function AdminTransactionsLive({ initialTransactions }: AdminTransactionsLiveProps) {
+export function AdminTransactionsLive({ users, initialTransactions }: AdminTransactionsLiveProps) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [live, setLive] = useState(false);
 
@@ -78,10 +82,6 @@ export function AdminTransactionsLive({ initialTransactions }: AdminTransactions
   }, []);
 
   return (
-    <AdminTransactionsList
-      transactions={transactions}
-      live={live}
-      totalStored={transactions.length}
-    />
+    <AdminUserTransactionHub users={users} transactions={transactions} live={live} />
   );
 }

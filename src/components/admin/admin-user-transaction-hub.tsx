@@ -1,0 +1,245 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import type { AdminTransactionRow } from "@/lib/actions/wallet";
+import {
+  formatTransactionAmount,
+  transactionSourceLabel,
+  transactionSummary,
+  type WalletTransactionRow,
+} from "@/lib/wallet/transaction-display";
+import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
+import { Search, Radio, User, X, Wallet, Gift } from "lucide-react";
+
+export interface AdminTransactionUser {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
+interface AdminUserTransactionHubProps {
+  users: AdminTransactionUser[];
+  transactions: AdminTransactionRow[];
+  live?: boolean;
+}
+
+function sumAmounts(rows: AdminTransactionRow[], type: "debit" | "credit") {
+  return rows
+    .filter((r) => r.transaction_type === type)
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+}
+
+function TransactionEntry({ row, compact }: { row: AdminTransactionRow; compact?: boolean }) {
+  const tx = row as WalletTransactionRow;
+  const isDebit = row.transaction_type === "debit";
+
+  return (
+    <div className="border-b border-border/60 py-3 last:border-0 last:pb-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <Badge variant="outline" className="text-[10px]">
+              {transactionSourceLabel(row.source)}
+            </Badge>
+            <Badge variant={isDebit ? "warning" : "success"} className="text-[10px]">
+              {isDebit ? "Debit" : "Credit"}
+            </Badge>
+          </div>
+          <p className={cn("text-sm", compact ? "line-clamp-2" : "")}>{transactionSummary(tx)}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {formatDate(row.created_at)} · {formatRelativeTime(row.created_at)}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "font-bold tabular-nums shrink-0 text-base",
+            isDebit ? "text-amber-400" : "text-emerald-400"
+          )}
+        >
+          {formatTransactionAmount(Number(row.amount), tx.transaction_type)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function WalletColumn({
+  title,
+  icon: Icon,
+  transactions,
+  emptyHint,
+}: {
+  title: string;
+  icon: typeof Wallet;
+  transactions: AdminTransactionRow[];
+  emptyHint: string;
+}) {
+  const debits = sumAmounts(transactions, "debit");
+  const credits = sumAmounts(transactions, "credit");
+
+  return (
+    <Card className="flex flex-col min-h-[320px]">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" />
+          {title}
+        </CardTitle>
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1">
+          <span>{transactions.length} transaction{transactions.length === 1 ? "" : "s"}</span>
+          {debits > 0 && <span className="text-amber-400">Loads out: −${debits.toFixed(2)}</span>}
+          {credits > 0 && <span className="text-emerald-400">Credits in: +${credits.toFixed(2)}</span>}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 overflow-y-auto max-h-[520px] pt-0">
+        {transactions.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">{emptyHint}</p>
+        ) : (
+          transactions.map((row) => <TransactionEntry key={row.id} row={row} compact />)
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AdminUserTransactionHub({ users, transactions, live }: AdminUserTransactionHubProps) {
+  const [userQuery, setUserQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const matchingUsers = useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    if (!q) return users.slice(0, 12);
+    return users
+      .filter(
+        (u) =>
+          u.full_name?.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+      )
+      .slice(0, 12);
+  }, [users, userQuery]);
+
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === selectedUserId) ?? null,
+    [users, selectedUserId]
+  );
+
+  const userTransactions = useMemo(() => {
+    if (!selectedUserId) return { deposit: [], bonus: [] };
+    const mine = transactions.filter((t) => t.user?.id === selectedUserId);
+    return {
+      deposit: mine.filter((t) => t.wallet_type === "current" || t.wallet_type === "cashout"),
+      bonus: mine.filter((t) => t.wallet_type === "bonus" || t.wallet_type === "bonus_redeem"),
+    };
+  }, [transactions, selectedUserId]);
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="relative max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={userQuery}
+            onChange={(e) => setUserQuery(e.target.value)}
+            placeholder="Search user by name or email (e.g. Jerzey longo)..."
+            className="pl-9"
+          />
+        </div>
+
+        {!selectedUser && (
+          <div className="flex flex-wrap gap-2">
+            {matchingUsers.map((u) => (
+              <Button
+                key={u.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto py-2 px-3 text-left flex-col items-start gap-0.5"
+                onClick={() => {
+                  setSelectedUserId(u.id);
+                  setUserQuery(u.full_name || u.email);
+                }}
+              >
+                <span className="font-medium">{u.full_name || "Unnamed"}</span>
+                <span className="text-xs text-muted-foreground font-normal">{u.email}</span>
+              </Button>
+            ))}
+            {matchingUsers.length === 0 && userQuery.trim() && (
+              <p className="text-sm text-muted-foreground">No users match that search.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {selectedUser ? (
+        <>
+          <Card>
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-lg truncate">
+                    {selectedUser.full_name || "Unnamed user"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground truncate">{selectedUser.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {live && (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+                    <Radio className="h-3 w-3 animate-pulse" />
+                    Live
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedUserId(null);
+                    setUserQuery("");
+                  }}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Change user
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <p className="text-sm text-muted-foreground">
+            Game loads & wallet movements only — account creation is not shown here (see{" "}
+            <span className="text-foreground">Wallet Loads</span> for bot queue).
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <WalletColumn
+              title="Total Deposit"
+              icon={Wallet}
+              transactions={userTransactions.deposit}
+              emptyHint="No deposit wallet loads or redeems yet for this user."
+            />
+            <WalletColumn
+              title="Bonus Wallet"
+              icon={Gift}
+              transactions={userTransactions.bonus}
+              emptyHint="No bonus wallet loads or redeems yet for this user."
+            />
+          </div>
+        </>
+      ) : (
+        <Card className="p-10 text-center">
+          <User className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+          <p className="font-medium">Select a user above</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            One user at a time — see their Total Deposit and Bonus Wallet history side by side.
+          </p>
+        </Card>
+      )}
+    </div>
+  );
+}

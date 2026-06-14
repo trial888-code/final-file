@@ -27,7 +27,12 @@ export default async function AdminGameLoadsPage() {
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Game Wallet Loads</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Juwa bot queue — wallet debited when user requests load. Bot or manual complete here.
+          Bot job queue — account creates, loads, and redeems waiting for the bot. For per-user
+          deposit &amp; bonus transaction history, use{" "}
+          <a href="/admin/transactions" className="text-primary hover:underline">
+            Admin → Transactions
+          </a>
+          .
         </p>
       </div>
 
