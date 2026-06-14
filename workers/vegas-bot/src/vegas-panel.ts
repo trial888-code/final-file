@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 import { passwordForAccount } from "./credentials.js";
+import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL = process.env.VEGAS_ADMIN_URL?.trim() || "https://agent.lasvegassweeps.com/login";
@@ -240,8 +241,8 @@ async function readPanelMessages(page: Page): Promise<string> {
   return messages.join(" ").replace(/\s+/g, " ").trim();
 }
 
-/** Panel rejects taken names with messages like "login name have used". */
-const DUPLICATE_RE = /exist|already|taken|duplicate|repeat|in ?use|have used|used|重复|已存在/i;
+/** Panel rejects taken / similar names ("login name have used", same-name rules). */
+const DUPLICATE_RE = DUPLICATE_USERNAME_RE;
 
 /** The create dialog stays open on error and closes on success. */
 function createDialogOpen(page: Page): Promise<boolean> {
@@ -306,23 +307,25 @@ export async function createAccount(
   password: string,
   variant: (base: string, attempt: number) => string
 ): Promise<{ username: string; password: string }> {
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let attempt = 0; attempt < CREATE_ACCOUNT_MAX_ATTEMPTS; attempt++) {
     const username = variant(baseUsername, attempt);
 
-    // Skip names already taken before attempting to create.
+    // Exact search miss is normal — Vegas also blocks globally "similar" names.
     if (await accountExists(page, username)) {
-      log("create", `"${username}" already exists — trying next variant`);
+      log("create", `"${username}" already on list — trying next variant`);
       continue;
     }
 
     const pwd = passwordForAccount(username, password);
+    log("create", `trying "${username}" (attempt ${attempt + 1})`);
     const outcome = await tryCreateOnce(page, username, pwd);
     if (outcome.status === "created") {
       log("create", `created ${username}`);
       return { username, password: pwd };
     }
     if (outcome.status === "duplicate") {
-      continue; // name got taken in a race — try the next variant
+      log("create", `"${username}" rejected as duplicate/similar — trying next variant`);
+      continue;
     }
 
     // A real error (e.g. validation) — stop so we don't create junk accounts.

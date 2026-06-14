@@ -52,6 +52,34 @@ export function transactionSummary(tx: WalletTransactionRow): string {
   return tx.description?.trim() || `${source} · ${wallet}`;
 }
 
+/** Admin two-panel view: Bonus vs Total Deposit (not raw wallet_type alone). */
+export function categorizeAdminTransactionPanel(tx: {
+  source: string;
+  wallet_type: string;
+}): "deposit" | "bonus" {
+  const { source, wallet_type } = tx;
+
+  if (source === "daily_task" || source === "spin") return "bonus";
+
+  if (wallet_type === "bonus" || wallet_type === "bonus_redeem") return "bonus";
+
+  if (
+    wallet_type === "current" ||
+    wallet_type === "cashout"
+  ) {
+    if (
+      source === "game_load" ||
+      source === "game_redeem" ||
+      source === "game_load_refund"
+    ) {
+      return "deposit";
+    }
+    if (source === "admin") return "deposit";
+  }
+
+  return "bonus";
+}
+
 export function gameLoadSummary(load: BonusGameLoadRow): string {
   if (load.load_type === "create_account") return `Create account · ${load.game_name}`;
   if (load.load_type === "redeem") {

@@ -1,5 +1,6 @@
 import type { Frame, Locator, Page } from "playwright";
 import { normalizeUsername } from "./credentials.js";
+import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL =
@@ -542,7 +543,7 @@ async function readPanelMessages(page: Page): Promise<string> {
   return messages.join(" ").replace(/\s+/g, " ").trim();
 }
 
-const DUPLICATE_RE = /exist|already|taken|duplicate|repeat|in ?use|have used|used|重复|已存在/i;
+const DUPLICATE_RE = DUPLICATE_USERNAME_RE;
 const NEW_ACCOUNT_RE = /new\s*account/i;
 
 function newAccountLocators(root: Page | Frame): Locator[] {
@@ -1056,7 +1057,7 @@ export async function createAccount(
   variant: (base: string, attempt: number) => string,
   options?: { forceNewAccount?: boolean }
 ): Promise<{ username: string; password: string }> {
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let attempt = 0; attempt < CREATE_ACCOUNT_MAX_ATTEMPTS; attempt++) {
     const username = normalizeUsername(variant(baseUsername, attempt));
 
     if (await accountExists(page, username)) {

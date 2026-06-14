@@ -10,6 +10,7 @@ import {
   formatTransactionAmount,
   transactionSourceLabel,
   transactionSummary,
+  categorizeAdminTransactionPanel,
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
@@ -130,8 +131,8 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
     if (!selectedUserId) return { deposit: [], bonus: [] };
     const mine = transactions.filter((t) => t.user?.id === selectedUserId);
     return {
-      deposit: mine.filter((t) => t.wallet_type === "current" || t.wallet_type === "cashout"),
-      bonus: mine.filter((t) => t.wallet_type === "bonus" || t.wallet_type === "bonus_redeem"),
+      deposit: mine.filter((t) => categorizeAdminTransactionPanel(t) === "deposit"),
+      bonus: mine.filter((t) => categorizeAdminTransactionPanel(t) === "bonus"),
     };
   }, [transactions, selectedUserId]);
 
@@ -212,8 +213,10 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
           </Card>
 
           <p className="text-sm text-muted-foreground">
-            Game loads & wallet movements only — account creation is not shown here (see{" "}
-            <span className="text-foreground">Wallet Loads</span> for bot queue).
+            <strong className="text-foreground font-medium">Total Deposit</strong> — loads & redeems
+            from the deposit wallet only.{" "}
+            <strong className="text-foreground font-medium">Bonus Wallet</strong> — bonus loads,
+            daily tasks, spin prizes, and bonus admin adjustments.
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -221,13 +224,13 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
               title="Total Deposit"
               icon={Wallet}
               transactions={userTransactions.deposit}
-              emptyHint="No deposit wallet loads or redeems yet for this user."
+              emptyHint="No deposit-wallet loads or redeems yet for this user."
             />
             <WalletColumn
               title="Bonus Wallet"
               icon={Gift}
               transactions={userTransactions.bonus}
-              emptyHint="No bonus wallet loads or redeems yet for this user."
+              emptyHint="No bonus wallet activity yet (loads, daily tasks, spin prizes)."
             />
           </div>
         </>

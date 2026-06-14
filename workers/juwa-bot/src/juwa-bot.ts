@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import type { GameLoadJob, JuwaBotResult } from "./types.js";
 import { planCreateAccount, variantFromPlan } from "../../shared/numbered-credentials.js";
+import { CREATE_ACCOUNT_MAX_ATTEMPTS } from "../../shared/panel-create.js";
 import { openBrowserSession, vpnHint } from "./browser.js";
 import {
   goToUserManagement,
@@ -42,7 +43,7 @@ async function resolveUniqueUsername(
   plan: ReturnType<typeof planCreateAccount>
 ): Promise<string> {
   const variant = variantFromPlan(plan);
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < CREATE_ACCOUNT_MAX_ATTEMPTS; attempt++) {
     const candidate = variant(plan.stem, attempt);
     const taken = await userExists(page, candidate).catch(() => false);
     if (!taken) {

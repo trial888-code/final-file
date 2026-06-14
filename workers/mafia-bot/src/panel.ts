@@ -1,5 +1,6 @@
 import type { Frame, Locator, Page } from "playwright";
 import { normalizeUsername, passwordForAccount } from "./credentials.js";
+import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isLoginPage, log, parseMoney, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 /**
@@ -546,7 +547,7 @@ export async function redeemAccount(
 /** Initial balance on the Add user form ($0 is accepted by the panel). */
 const CREATE_INITIAL_BALANCE = "0";
 
-const DUPLICATE_RE = /exist|already|taken|duplicate|repeat|in ?use|have used|used|登录名|重复|已存在/i;
+const DUPLICATE_RE = DUPLICATE_USERNAME_RE;
 const VALIDATION_RE =
   /required|cannot be blank|format|length|invalid|incorrect|6\s*to\s*13|6-13|至少|不能为空|格式|character/i;
 const SUCCESS_RE = /success|成功|added|complete|created/i;
@@ -658,7 +659,7 @@ export async function createAccount(
   variant: (base: string, attempt: number) => string,
   options?: { forceNewAccount?: boolean }
 ): Promise<{ username: string; password: string }> {
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < CREATE_ACCOUNT_MAX_ATTEMPTS; attempt++) {
     const username = normalizeUsername(variant(baseUsername, attempt));
     const pwd = passwordForAccount(username, password);
 

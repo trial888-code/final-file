@@ -1,8 +1,8 @@
 /**
- * Vegas Sweeps account names: letters/numbers/underscore, 13 chars or fewer
- * (panel rule). Password defaults to the username unless the user picked one.
+ * Vegas Sweeps account names: letters/numbers/underscore, 13 chars or fewer.
+ * Password defaults to the username unless the user picked one.
+ * Username variants use shared numbered-credentials (padded + numbered).
  */
-const MAX_LEN = 13;
 export function buildVegasCredentials(profile: {
   full_name?: string | null;
   email?: string | null;
@@ -30,41 +30,11 @@ export function buildVegasCredentials(profile: {
 
   if (!base) base = "player";
 
-  const username = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN);
+  const username = base.replace(/[^a-z0-9_]/g, "").slice(0, 13);
   return { username, password: username };
 }
 
 /** Login password — defaults to username when the user did not pick one. */
 export function passwordForAccount(username: string, preferred?: string | null): string {
   return preferred?.trim() || username;
-}
-
-/** Random suffix from an unambiguous alphabet (no 0/o/1/l/i). */
-function randomSuffix(len: number): string {
-  const chars = "abcdefghjkmnpqrstuvwxyz23456789";
-  let s = "";
-  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
-
-/**
- * The panel rejects duplicate names — and login names are unique across the
- * WHOLE platform, so common names + single-letter suffixes are often already
- * taken by other stores. Try the plain name first, then a couple of short
- * friendly suffixes, then random suffixes that almost never collide:
- *   attempt 0    -> base
- *   attempt 1..2 -> base + digit (base1, base2)
- *   attempt 3..5 -> base + 2 random chars
- *   attempt 6+   -> base + 3 random chars
- */
-export function usernameVariant(base: string, attempt: number): string {
-  const clean = base.replace(/[^a-z0-9_]/g, "").slice(0, MAX_LEN) || "player";
-  if (attempt <= 0) return clean;
-
-  let suffix: string;
-  if (attempt <= 2) suffix = String(attempt);
-  else suffix = randomSuffix(attempt <= 5 ? 2 : 3);
-
-  const room = MAX_LEN - suffix.length;
-  return `${clean.slice(0, Math.max(1, room))}${suffix}`;
 }

@@ -1,4 +1,5 @@
 import type { Locator, Page } from "playwright";
+import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL = process.env.GAMEVAULT_ADMIN_URL?.trim() || "https://agent.gamevault999.com/login";
@@ -241,7 +242,7 @@ async function readPanelMessages(page: Page): Promise<string> {
 }
 
 /** Panel rejects taken names with messages like "login name have used". */
-const DUPLICATE_RE = /exist|already|taken|duplicate|repeat|in ?use|have used|used|重复|已存在/i;
+const DUPLICATE_RE = DUPLICATE_USERNAME_RE;
 
 /** The create dialog stays open on error and closes on success. */
 function createDialogOpen(page: Page): Promise<boolean> {
@@ -309,7 +310,7 @@ export async function createAccount(
 ): Promise<{ username: string; password: string }> {
   const forceNewAccount = Boolean(options?.forceNewAccount);
 
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let attempt = 0; attempt < CREATE_ACCOUNT_MAX_ATTEMPTS; attempt++) {
     const username = variant(baseUsername, attempt);
 
     if (await accountExists(page, username)) {

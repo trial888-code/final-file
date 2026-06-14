@@ -1,6 +1,13 @@
-/** Shared Spinora bot naming: name + number, always at least 7 characters (e.g. amy → amy0097). */
+/** Shared Spinora bot naming: stem + 4 unique digits (e.g. anthony → anthony0421). */
 export const MIN_ACCOUNT_USERNAME_LEN = 7;
 export const DEFAULT_MAX_LEN = 13;
+/** Four different digits at the end — avoids global "similar name" collisions (anthony2, anthony3). */
+export const SUFFIX_DIGIT_LEN = 4;
+
+/** Extra letter runs before the digit suffix when panels still reject a name. */
+export const SIMILARITY_PAD_CHAR = "y";
+/** Letter-padding tries per digit suffix before rolling a new 4-digit code. */
+export const PAD_LEVELS_PER_NUM = 6;
 
 export function cleanAccountStem(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -27,6 +34,18 @@ export function ensureMinUsername(
   if (u.length >= minLen) return u;
   const need = minLen - u.length;
   return `${u}${randomDigitSuffix(need)}`.slice(0, maxLen);
+}
+
+/** Four digits, all different (e.g. 0421, 9153) — seeded so retries get new codes. */
+export function distinctFourDigitSuffix(seed: number): string {
+  const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  let s = Math.abs(seed) || 1;
+  for (let i = digits.length - 1; i > 0; i--) {
+    s = (s * 1103515245 + 12345) >>> 0;
+    const j = s % (i + 1);
+    [digits[i], digits[j]] = [digits[j], digits[i]];
+  }
+  return digits.slice(0, SUFFIX_DIGIT_LEN).join("");
 }
 
 export function profileNameStem(
@@ -68,53 +87,77 @@ export function parseNumberedUsername(username: string): { stem: string; num: nu
   return { stem: clean || "player", num: 0 };
 }
 
+/** Seed for the next 4-digit suffix (not sequential anthony2 → anthony3). */
+export function suffixSeedFromPrior(existingUsername: string | null | undefined): number {
+  if (!existingUsername?.trim()) return Date.now() % 100_000;
+  const clean = cleanAccountStem(existingUsername.trim());
+  let h = 0;
+  for (let i = 0; i < clean.length; i++) h = (h * 31 + clean.charCodeAt(i)) >>> 0;
+  const { num } = parseNumberedUsername(existingUsername);
+  return (h + num * 1009 + 1) % 100_000;
+}
+
+/** @deprecated Sequential numbers — use distinctFourDigitSuffix via usernameVariant. */
 export function numberedUsername(
   stem: string,
   num: number,
   maxLen = DEFAULT_MAX_LEN,
   minLen = MIN_ACCOUNT_USERNAME_LEN
 ): string {
-  const n = String(num);
-  let base = cleanAccountStem(stem).slice(0, Math.max(1, maxLen - n.length)) || "player";
-  let candidate = `${base}${n}`;
-
-  if (candidate.length < minLen) {
-    const pad = minLen - candidate.length;
-    const baseRoom = Math.max(1, maxLen - n.length - pad);
-    base = cleanAccountStem(stem).slice(0, baseRoom) || "player";
-    candidate = `${base}${randomDigitSuffix(pad)}${n}`.slice(0, maxLen);
-  }
-
-  return ensureMinUsername(candidate, minLen, maxLen);
+  const digitSuffix = distinctFourDigitSuffix(num * 997 + stem.length);
+  return suffixUsername(stem, digitSuffix, 0, maxLen, minLen);
 }
 
+/** @deprecated Use suffixSeedFromPrior — kept for imports. */
 export function nextNumberAfterExisting(existingUsername: string | null | undefined): number {
-  if (!existingUsername?.trim()) return 1;
-  const { num } = parseNumberedUsername(existingUsername.trim());
-  return num > 0 ? num + 1 : 2;
+  return suffixSeedFromPrior(existingUsername);
 }
 
-/** @param startNum 1 = name1 first; 2 = name2 first (replace); 0 = exact name then name1, name2… */
+function suffixUsername(
+  stem: string,
+  digitSuffix: string,
+  letterPadLevel: number,
+  maxLen: number,
+  minLen: number
+): string {
+  const padding = letterPadLevel === 0 ? "" : SIMILARITY_PAD_CHAR.repeat(letterPadLevel * 2);
+  const suffix = `${padding}${digitSuffix}`;
+  const basePart = stem.slice(0, Math.max(1, maxLen - suffix.length)) || "player";
+  return ensureMinUsername(`${basePart}${suffix}`, minLen, maxLen);
+}
+
+/**
+ * Username variants: anthony0421 → anthonyyy9153 → anthonyyyy3840 …
+ * Custom exact name: startNum 0 uses stem once, then 4-digit suffixes.
+ */
 export function usernameVariant(
   base: string,
   attempt: number,
-  startNum = 1,
+  suffixSeed = 1,
   maxLen = DEFAULT_MAX_LEN,
   minLen = MIN_ACCOUNT_USERNAME_LEN
 ): string {
   const stem = cleanAccountStem(base).slice(0, maxLen) || "player";
-  if (startNum === 0) {
-    if (attempt === 0) return ensureMinUsername(stem, minLen, maxLen);
-    return numberedUsername(stem, attempt, maxLen, minLen);
+
+  if (suffixSeed === 0 && attempt === 0) {
+    return ensureMinUsername(stem, minLen, maxLen);
   }
-  return numberedUsername(stem, startNum + attempt, maxLen, minLen);
+
+  const effectiveAttempt = suffixSeed === 0 ? attempt - 1 : attempt;
+  const padLevel = effectiveAttempt % PAD_LEVELS_PER_NUM;
+  const round = Math.floor(effectiveAttempt / PAD_LEVELS_PER_NUM);
+  const seed = (suffixSeed || 1) + round * 1009 + effectiveAttempt * 97;
+  const fourDigits = distinctFourDigitSuffix(seed);
+
+  return suffixUsername(stem, fourDigits, padLevel, maxLen, minLen);
 }
 
 export interface CreateAccountPlan {
   stem: string;
+  /** Seed for 4-digit suffix generation (0 = try exact stem on first attempt). */
   startNum: number;
   preferredPassword?: string | null;
-  /** When true, never reuse an existing panel login — always pick the next free number. */
+  /** When true, never reuse an existing panel login — always pick a new 4-digit suffix. */
   forceNewAccount: boolean;
 }
 
@@ -132,19 +175,27 @@ export function planCreateAccount(job: {
   );
 
   if (customUser) {
-    const clean = ensureMinUsername(customUser.slice(0, DEFAULT_MAX_LEN));
+    const clean = cleanAccountStem(customUser).slice(0, DEFAULT_MAX_LEN) || "player";
     const { stem, num } = parseNumberedUsername(clean);
     const password = job.game_password?.trim() || null;
+    if (num > 0 && !forceNewAccount) {
+      return {
+        stem: clean,
+        startNum: 0,
+        preferredPassword: password,
+        forceNewAccount,
+      };
+    }
     if (num > 0) {
       return {
         stem,
-        startNum: forceNewAccount ? nextNumberAfterExisting(clean) : num,
+        startNum: suffixSeedFromPrior(clean),
         preferredPassword: password,
         forceNewAccount,
       };
     }
     return {
-      stem: cleanAccountStem(clean) || "player",
+      stem: clean,
       startNum: 0,
       preferredPassword: password,
       forceNewAccount,
@@ -155,7 +206,7 @@ export function planCreateAccount(job: {
     full_name: job.requester_name,
     email: job.requester_email,
   });
-  const startNum = nextNumberAfterExisting(job.prior_game_username);
+  const startNum = suffixSeedFromPrior(job.prior_game_username);
 
   return { stem, startNum, preferredPassword: null, forceNewAccount };
 }
@@ -170,6 +221,12 @@ export function buildCredentials(profile: {
   email?: string | null;
 }): { username: string; password: string } {
   const stem = profileNameStem(profile);
-  const username = numberedUsername(stem, 1);
+  const username = suffixUsername(
+    stem,
+    distinctFourDigitSuffix(Date.now() % 100_000),
+    0,
+    DEFAULT_MAX_LEN,
+    MIN_ACCOUNT_USERNAME_LEN
+  );
   return { username, password: username };
 }
