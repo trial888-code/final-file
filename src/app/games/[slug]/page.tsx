@@ -6,6 +6,9 @@ import { BreadcrumbSchema, GamePageSchema } from "@/lib/seo/json-ld";
 import { SITE_URL } from "@/lib/constants";
 import { GAMES, getGameBySlug } from "@/lib/games";
 import { isWalletLoadEnabledForGame } from "@/lib/game-automation/config";
+import { getMyGameAccount } from "@/lib/actions/game-loads";
+
+export const dynamic = "force-dynamic";
 
 interface GamePageProps {
   params: Promise<{ slug: string }>;
@@ -37,6 +40,9 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
 
   if (!game) notFound();
 
+  const walletLoadEnabled = isWalletLoadEnabledForGame(game.slug);
+  const initialGameAccount = walletLoadEnabled ? await getMyGameAccount(game.slug) : null;
+
   return (
     <>
       <BreadcrumbSchema
@@ -49,7 +55,8 @@ export default async function GamePage({ params, searchParams }: GamePageProps) 
       <GamePageShell
         game={game}
         autoCreate={create === "1"}
-        walletLoadEnabled={isWalletLoadEnabledForGame(game.slug)}
+        walletLoadEnabled={walletLoadEnabled}
+        initialGameAccount={initialGameAccount}
       />
     </>
   );

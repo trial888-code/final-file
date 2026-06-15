@@ -38,16 +38,27 @@ interface GameLandingClientProps {
   game: Game;
   autoCreate?: boolean;
   walletLoadEnabled?: boolean;
+  initialGameAccount?: {
+    game_username: string;
+    game_password: string | null;
+  } | null;
 }
 
-export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameLandingClientProps) {
+export function GameLandingClient({
+  game,
+  autoCreate,
+  walletLoadEnabled,
+  initialGameAccount,
+}: GameLandingClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const howItWorksRef = useRef<HTMLDivElement>(null);
   const autoCreateAttempted = useRef(false);
   const walletPanelRef = useRef<HTMLDivElement>(null);
-  const [accountStatus, setAccountStatus] = useState<"loading" | "none" | "has">("loading");
+  const [accountStatus, setAccountStatus] = useState<"loading" | "none" | "has">(
+    initialGameAccount?.game_username ? "has" : "loading"
+  );
   const [winner, setWinner] = useState<GameWinner | null>(null);
   const [moreWinners, setMoreWinners] = useState(0);
   const [showAllWinners, setShowAllWinners] = useState(false);
@@ -122,6 +133,17 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
   }
 
   const rules = GAME_BONUS_RULES;
+  const showWalletPanel = Boolean(walletLoadEnabled && !game.upcoming);
+
+  const walletSection = showWalletPanel ? (
+    <div ref={walletPanelRef} className="scroll-mt-24">
+      <GameWalletLoadSection
+        game={game}
+        initialAccount={initialGameAccount}
+        onAccountChange={handleAccountChange}
+      />
+    </div>
+  ) : null;
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-8">
@@ -160,6 +182,8 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
           </div>
         </div>
       </section>
+
+      {walletSection}
 
       {/* Recent winners */}
       <section className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 sm:p-5">
@@ -273,18 +297,9 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
         <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
       </section>
 
-      {!game.upcoming && walletLoadEnabled && (
-        <div ref={walletPanelRef} className="scroll-mt-24">
-          <GameWalletLoadSection
-            game={game}
-            onAccountChange={handleAccountChange}
-          />
-        </div>
-      )}
-
-      {/* CTAs — Create Account only when user has no game login yet */}
+      {/* Create Account — only when user has no game login yet */}
       <section className="space-y-3">
-        {accountStatus !== "has" && (
+        {accountStatus === "none" && (
           <button
             type="button"
             onClick={handleCreateAccount}

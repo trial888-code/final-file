@@ -48,10 +48,18 @@ import { WALLET_REFRESH_EVENT } from "@/lib/wallet/use-live-wallet";
 
 interface GameWalletLoadSectionProps {
   game: Game;
+  initialAccount?: {
+    game_username: string;
+    game_password: string | null;
+  } | null;
   onAccountChange?: (hasAccount: boolean) => void;
 }
 
-export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadSectionProps) {
+export function GameWalletLoadSection({
+  game,
+  initialAccount,
+  onAccountChange,
+}: GameWalletLoadSectionProps) {
   const supabase = useMemo(() => createClient(), []);
 
   const [walletBalance, setWalletBalance] = useState(0);
@@ -75,13 +83,20 @@ export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadS
   const [savedAccount, setSavedAccount] = useState<{
     game_username: string;
     game_password: string | null;
-  } | null>(null);
+  } | null>(
+    initialAccount?.game_username
+      ? {
+          game_username: initialAccount.game_username,
+          game_password: initialAccount.game_password,
+        }
+      : null
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [depositRollover, setDepositRollover] = useState<DepositRolloverBounds | null>(null);
   const failedToastRef = useRef<string | null>(null);
   const pendingLoadIdsRef = useRef<Set<string>>(new Set());
-  const accountReadyRef = useRef(false);
+  const accountReadyRef = useRef(Boolean(initialAccount?.game_username));
 
   const refreshWallet = useCallback(async () => {
     if (!supabase) return;

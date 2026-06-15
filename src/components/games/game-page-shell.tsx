@@ -11,9 +11,18 @@ interface GamePageShellProps {
   game: Game;
   autoCreate?: boolean;
   walletLoadEnabled?: boolean;
+  initialGameAccount?: {
+    game_username: string;
+    game_password: string | null;
+  } | null;
 }
 
-export function GamePageShell({ game, autoCreate, walletLoadEnabled }: GamePageShellProps) {
+export function GamePageShell({
+  game,
+  autoCreate,
+  walletLoadEnabled,
+  initialGameAccount,
+}: GamePageShellProps) {
   const router = useRouter();
 
   return (
@@ -28,7 +37,12 @@ export function GamePageShell({ game, autoCreate, walletLoadEnabled }: GamePageS
         />
       }
     >
-      <GameLandingClient game={game} autoCreate={autoCreate} walletLoadEnabled={walletLoadEnabled} />
+      <GameLandingClient
+        game={game}
+        autoCreate={autoCreate}
+        walletLoadEnabled={walletLoadEnabled}
+        initialGameAccount={initialGameAccount}
+      />
     </AppShell>
   );
 }
