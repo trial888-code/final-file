@@ -19,7 +19,7 @@ AS $$
   SELECT
     (SELECT COUNT(*)::BIGINT FROM public.wheel_spins, day WHERE created_at >= day.start),
     (SELECT COUNT(*)::BIGINT FROM public.wheel_spins, day WHERE created_at >= day.start AND prize_value = 10),
-    (SELECT COUNT(*)::BIGINT FROM public.wheel_spins, day WHERE created_at >= day.start AND prize_value = 20),
+    (SELECT COUNT(*)::BIGINT FROM public.wheel_spins, day WHERE created_at >= day.start AND prize_value = 7),
     (SELECT COUNT(*)::BIGINT FROM public.wheel_spins, day
       WHERE created_at >= day.start AND prize_type = 'cash' AND prize_value BETWEEN 1 AND 4);
 $$;

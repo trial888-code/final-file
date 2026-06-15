@@ -9,7 +9,7 @@ export interface WheelPrize {
 }
 
 export const WHEEL_PRIZES: WheelPrize[] = [
-  { id: "20", label: "$20", type: "cash", value: 20, emoji: "💎", color: "#1a0a2e", weight: 1 },
+  { id: "7", label: "$7", type: "cash", value: 7, emoji: "💎", color: "#1a0a2e", weight: 1 },
   { id: "luck1", label: "BETTER LUCK NEXT TIME", type: "luck", value: 0, emoji: "🎲", color: "#0c1830", weight: 42 },
   { id: "2", label: "$2", type: "cash", value: 2, emoji: "💵", color: "#0a1428", weight: 4 },
   { id: "3", label: "$3", type: "cash", value: 3, emoji: "🥇", color: "#0c1830", weight: 4 },

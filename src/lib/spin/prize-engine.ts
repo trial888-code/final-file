@@ -4,7 +4,7 @@ import { WHEEL_PRIZES, pickWeightedPrize } from "@/lib/spin/prizes";
 /** Platform-wide: at most 1 × $10 winner per this many spins (UTC day). */
 export const SPINS_PER_TEN_DOLLAR_WIN = 20;
 
-/** Platform-wide: at most 1 × $20 winner per this many spins (UTC day). */
+/** Platform-wide: at most 1 × $7 winner per this many spins (UTC day). */
 export const SPINS_PER_TWENTY_DOLLAR_WIN = 100;
 
 /** Max small cash wins ($1–$4) per this many spins (UTC day). */
@@ -13,7 +13,7 @@ export const SPINS_PER_SMALL_CASH_WIN = 12;
 /** Extra random gate when a $10 slot is open (≈1 winner per 20 spins). */
 export const TEN_DOLLAR_SLOT_CHANCE = 1 / SPINS_PER_TEN_DOLLAR_WIN;
 
-/** Extra random gate when a $20 slot is open. */
+/** Extra random gate when a $7 slot is open. */
 export const TWENTY_DOLLAR_SLOT_CHANCE = 0.02;
 
 /** Extra random gate when a small-cash slot is open. */
@@ -66,7 +66,7 @@ export function resolveSpinPrize(
     return { prize: picked, index: pickedIndex };
   }
 
-  if (picked.value === 20) {
+  if (picked.value === 7) {
     const slots = maxWinnersAllowed(spinsIncludingCurrent, SPINS_PER_TWENTY_DOLLAR_WIN);
     if (stats.twentyDollarWinners >= slots || random() >= TWENTY_DOLLAR_SLOT_CHANCE) {
       return luckPrize();

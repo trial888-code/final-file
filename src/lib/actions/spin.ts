@@ -80,7 +80,7 @@ async function getGlobalSpinStats(): Promise<GlobalSpinStats> {
         .from("wheel_spins")
         .select("*", { count: "exact", head: true })
         .gte("created_at", dayStart)
-        .eq("prize_value", 20),
+        .eq("prize_value", 7),
       supabase
         .from("wheel_spins")
         .select("*", { count: "exact", head: true })
