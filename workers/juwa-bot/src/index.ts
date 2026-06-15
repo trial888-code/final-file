@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { enrichGameLoadJob } from "../../shared/enrich-game-load-job.js";
+import { sanitizeBotErrorForUser } from "../../shared/user-facing-error.js";
 import { runJuwaJob } from "./juwa-bot.js";
 import type { GameLoadJob } from "./types.js";
 
@@ -89,7 +90,9 @@ async function processOne(supabase: ReturnType<typeof createAdminSupabase>) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[juwa-bot] Failed ${job.id}:`, message);
     try {
-      await complete(supabase, job.id, false, { error: message.slice(0, 500) });
+      await complete(supabase, job.id, false, {
+        error: sanitizeBotErrorForUser(message, enrichedJob.load_type),
+      });
     } catch (completeErr) {
       console.error("[juwa-bot] Could not mark job failed:", completeErr);
     }

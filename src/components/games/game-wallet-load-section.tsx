@@ -41,6 +41,10 @@ import {
   maxUsernameLenForGame,
 } from "@/lib/game-automation/account-username";
 import { previewJuwaUsername } from "@/lib/game-automation/juwa-credentials";
+import {
+  showGameLoadErrorDetail,
+  userFacingGameLoadError,
+} from "@/lib/game-automation/user-facing-errors";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import type { DepositRolloverBounds } from "@/lib/wallet/deposit-redeem-rollover";
@@ -95,6 +99,9 @@ export function GameWalletLoadSection({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [depositRollover, setDepositRollover] = useState<DepositRolloverBounds | null>(null);
   const failedToastRef = useRef<string | null>(null);
+  const pendingJobIdsRef = useRef<Set<string>>(new Set());
+  const failedToastShownRef = useRef<Set<string>>(new Set());
+  const seededHistoricalFailuresRef = useRef(false);
   const pendingLoadIdsRef = useRef<Set<string>>(new Set());
   const accountReadyRef = useRef(Boolean(initialAccount?.game_username));
 
@@ -152,10 +159,37 @@ export function GameWalletLoadSection({
       void refreshWallet();
     }
 
-    const failed = loads.find((l) => l.status === "failed" && l.error_message);
-    if (failed && failedToastRef.current !== failed.id) {
-      failedToastRef.current = failed.id;
-      toast.error(failed.error_message ?? "Request failed. Try again or contact support.");
+    if (!seededHistoricalFailuresRef.current) {
+      for (const load of loads) {
+        if (load.status === "failed") failedToastShownRef.current.add(load.id);
+      }
+      seededHistoricalFailuresRef.current = true;
+    }
+
+    for (const load of loads) {
+      if (load.status === "pending" || load.status === "processing") {
+        pendingJobIdsRef.current.add(load.id);
+      }
+      if (load.status === "completed" || load.status === "cancelled") {
+        pendingJobIdsRef.current.delete(load.id);
+      }
+    }
+
+    const justFailed = loads.find(
+      (load) =>
+        load.status === "failed" &&
+        load.error_message &&
+        pendingJobIdsRef.current.has(load.id) &&
+        !failedToastShownRef.current.has(load.id)
+    );
+    if (justFailed) {
+      failedToastShownRef.current.add(justFailed.id);
+      pendingJobIdsRef.current.delete(justFailed.id);
+      failedToastRef.current = justFailed.id;
+      toast.error(
+        userFacingGameLoadError(justFailed.error_message, justFailed.load_type) ??
+          "Request failed. Try again or contact support."
+      );
       void refreshWallet();
     }
 
@@ -1052,8 +1086,11 @@ export function GameWalletLoadSection({
                   {formatRelativeTime(load.created_at)}
                 </span>
               </div>
-              {load.status === "failed" && load.error_message && (
-                <p className="text-red-400/90 mt-1 leading-snug">{load.error_message}</p>
+              {load.status === "failed" &&
+                showGameLoadErrorDetail(load.error_message, load.load_type) && (
+                <p className="text-red-400/90 mt-1 leading-snug">
+                  {userFacingGameLoadError(load.error_message, load.load_type)}
+                </p>
               )}
               {(load.status === "pending" || load.status === "processing") &&
                 isAutomatedGameSlug(game.slug) && (
