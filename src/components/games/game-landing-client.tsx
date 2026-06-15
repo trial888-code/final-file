@@ -49,7 +49,7 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
   const autoCreateAttempted = useRef(false);
   const walletPanelRef = useRef<HTMLDivElement>(null);
   const [showWalletPanel, setShowWalletPanel] = useState(false);
-  const [hasGameAccount, setHasGameAccount] = useState(false);
+  const [accountStatus, setAccountStatus] = useState<"loading" | "none" | "has">("loading");
   const [winner, setWinner] = useState<GameWinner | null>(null);
   const [moreWinners, setMoreWinners] = useState(0);
   const [showAllWinners, setShowAllWinners] = useState(false);
@@ -87,11 +87,21 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
   }
 
   useEffect(() => {
-    if (!walletLoadEnabled || game.upcoming) return;
+    if (!walletLoadEnabled || game.upcoming) {
+      setAccountStatus("none");
+      return;
+    }
     void getMyGameAccount(game.slug).then((account) => {
-      setHasGameAccount(Boolean(account?.game_username));
+      const has = Boolean(account?.game_username);
+      setAccountStatus(has ? "has" : "none");
+      if (has) setShowWalletPanel(true);
     });
   }, [walletLoadEnabled, game.slug, game.upcoming]);
+
+  function handleAccountChange(hasAccount: boolean) {
+    setAccountStatus(hasAccount ? "has" : "none");
+    if (hasAccount) setShowWalletPanel(true);
+  }
 
   useEffect(() => {
     if (!autoCreate || autoCreateAttempted.current) return;
@@ -279,21 +289,30 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
         <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
       </section>
 
-      {/* CTAs */}
+      {/* CTAs — Create Account only when user has no game login yet */}
       <section className="space-y-3">
-        <button
-          type="button"
-          onClick={handleCreateAccount}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 rounded-xl py-4 px-6 text-base font-bold transition-opacity shadow-lg",
-            game.upcoming
-              ? "text-white/80 bg-[#2a2a2a] border border-white/10 cursor-not-allowed opacity-80"
-              : "text-black bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 hover:opacity-95 shadow-orange-500/20"
-          )}
-        >
-          <UserPlus className="h-5 w-5" />
-          {game.upcoming ? "Coming Soon" : hasGameAccount ? "Replace Account" : "Create Account"}
-        </button>
+        {accountStatus !== "has" && (
+          <button
+            type="button"
+            onClick={handleCreateAccount}
+            disabled={accountStatus === "loading"}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 rounded-xl py-4 px-6 text-base font-bold transition-opacity shadow-lg",
+              game.upcoming
+                ? "text-white/80 bg-[#2a2a2a] border border-white/10 cursor-not-allowed opacity-80"
+                : accountStatus === "loading"
+                  ? "text-white/70 bg-[#2a2a2a] border border-white/10 cursor-wait opacity-80"
+                  : "text-black bg-gradient-to-r from-yellow-400 via-orange-400 to-red-500 hover:opacity-95 shadow-orange-500/20"
+            )}
+          >
+            <UserPlus className="h-5 w-5" />
+            {game.upcoming
+              ? "Coming Soon"
+              : accountStatus === "loading"
+                ? "Loading…"
+                : "Create Account"}
+          </button>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <a
@@ -316,11 +335,11 @@ export function GameLandingClient({ game, autoCreate, walletLoadEnabled }: GameL
         </div>
       </section>
 
-      {!game.upcoming && walletLoadEnabled && showWalletPanel && (
+      {!game.upcoming && walletLoadEnabled && (showWalletPanel || accountStatus === "has") && (
         <div ref={walletPanelRef} className="scroll-mt-24">
           <GameWalletLoadSection
             game={game}
-            onAccountChange={(hasAccount) => setHasGameAccount(hasAccount)}
+            onAccountChange={handleAccountChange}
           />
         </div>
       )}

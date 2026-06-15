@@ -589,9 +589,12 @@ export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadS
             </button>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No account yet. Create one below — free, no wallet charge.
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground">
+              No account yet. Tap <strong className="text-white">Create Account</strong> above or
+              use the button below — free, no wallet charge.
+            </p>
+          </>
         )}
 
         {customMode ? (
@@ -643,6 +646,32 @@ export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadS
               </button>
             </div>
           </div>
+        ) : hasSavedAccount ? (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleCreateAccount()}
+              disabled={creating || pendingCreate}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              {creating || pendingCreate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
+              {creating ? "Replacing account…" : pendingCreateButtonLabel()}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomMode(true)}
+              disabled={creating || pendingCreate}
+              title="Choose your own username & password"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="hidden sm:inline">Own login</span>
+            </button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <button
@@ -656,7 +685,7 @@ export function GameWalletLoadSection({ game, onAccountChange }: GameWalletLoadS
               ) : (
                 <UserPlus className="h-4 w-4" />
               )}
-              {creating ? (hasSavedAccount ? "Replacing account…" : "Creating account…") : pendingCreateButtonLabel()}
+              {creating ? "Creating account…" : pendingCreateButtonLabel()}
             </button>
             <button
               type="button"
