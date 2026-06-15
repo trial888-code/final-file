@@ -620,8 +620,8 @@ export function GameWalletLoadSection({
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              No account yet. Tap <strong className="text-white">Create Account</strong> above or
-              use the button below — free, no wallet charge.
+              No account yet. Use <strong className="text-white">Create Account</strong> below or
+              the button in this panel — free, no wallet charge.
             </p>
           </>
         )}

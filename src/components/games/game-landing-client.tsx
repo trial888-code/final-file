@@ -100,14 +100,23 @@ export function GameLandingClient({
   }
 
   useEffect(() => {
-    if (initialGameAccount?.game_username || !walletLoadEnabled || game.upcoming) return;
-    void getMyGameAccount(game.slug).then((account) => {
-      if (account?.game_username) {
-        setAccountStatus("has");
-      } else {
-        setAccountStatus("none");
-      }
-    });
+    if (!walletLoadEnabled || game.upcoming) {
+      setAccountStatus("none");
+      return;
+    }
+    if (initialGameAccount?.game_username) {
+      setAccountStatus("has");
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const account = await getMyGameAccount(game.slug);
+      if (cancelled) return;
+      setAccountStatus(account?.game_username ? "has" : "none");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [game.slug, game.upcoming, initialGameAccount?.game_username, walletLoadEnabled]);
 
   useEffect(() => {
@@ -309,7 +318,10 @@ export function GameLandingClient({
         <p className="text-sm text-muted-foreground leading-relaxed">{game.bio}</p>
       </section>
 
-      {/* Create Account — new users only; never Replace at top */}
+      {/* Account panel — always visible; credentials show here when account exists */}
+      {walletSection}
+
+      {/* Top button: Create Account for new users only — never Replace */}
       <section className="space-y-3">
         {!hasAccount && accountStatus === "none" && (
           <button
@@ -347,8 +359,6 @@ export function GameLandingClient({
           </button>
         </div>
       </section>
-
-      {walletSection}
 
       {!game.upcoming && <GameDepositSection game={game} />}
 
