@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { TaskProofForm } from "@/components/tasks/task-proof-form";
 import { isTaskUnlocked, getLevelTaskProgress } from "@/lib/tasks/utils";
-import { getTasksForLevel, type TaskDefinition } from "@/lib/tasks/definitions";
+import { formatTaskDay, getTasksForLevel, type TaskDefinition } from "@/lib/tasks/definitions";
 import type { TaskBoardData } from "@/lib/actions/daily-tasks";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +71,7 @@ export function TaskCard({ task, board, compact }: TaskCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-400">
-              Level {task.level}
+              {formatTaskDay(task.level)}
             </span>
             <span className="text-[10px] text-muted-foreground capitalize">{task.category}</span>
             {state.status === "approved" && (
@@ -95,7 +95,7 @@ export function TaskCard({ task, board, compact }: TaskCardProps) {
       {!compact && board.activeLevel === task.level && state.status !== "locked" && (
         <div className="mb-3">
           <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-            <span>Level progress</span>
+            <span>Day progress</span>
             <span>
               {levelProgress.approved}/{levelProgress.total}
             </span>

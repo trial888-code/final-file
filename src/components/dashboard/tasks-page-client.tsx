@@ -92,7 +92,7 @@ export function TasksPageClient() {
       <TaskSubmissionsLiveRefresh />
       <DashboardPageHeader
         title="Daily Tasks"
-        description="Complete one level a day, claim your cash reward to your Bonus wallet, and unlock the next level after 24 hours"
+        description="Complete one day at a time across our 7-day plan — claim cash to your Bonus wallet; the next day unlocks 24 hours after you claim"
       />
       <DailyTasksClient board={board} onReload={load} />
     </div>

@@ -1,4 +1,4 @@
-import { getTaskById } from "@/lib/tasks/definitions";
+import { formatTaskDay, getTaskById } from "@/lib/tasks/definitions";
 import type { TaskSubmission, UserLevelProgress } from "@/lib/tasks/types";
 
 /** A level unlocks this many hours after the previous level's reward is claimed. */
@@ -45,7 +45,7 @@ export function isTaskUnlocked(
       if (prev?.status === "completed" && !prev.reward_granted) {
         return {
           unlocked: false,
-          reason: `Claim your Level ${task.level - 1} reward first`,
+          reason: `Claim your ${formatTaskDay(task.level - 1)} reward first`,
           status: "locked",
         };
       }
@@ -54,12 +54,12 @@ export function isTaskUnlocked(
         const hours = Math.ceil(unlock.msRemaining / (60 * 60 * 1000));
         return {
           unlocked: false,
-          reason: `Level ${task.level} unlocks in about ${hours}h`,
+          reason: `${formatTaskDay(task.level)} unlocks in about ${hours}h`,
           status: "locked",
         };
       }
     }
-    return { unlocked: false, reason: `Complete Level ${task.level - 1} first`, status: "locked" };
+    return { unlocked: false, reason: `Complete ${formatTaskDay(task.level - 1)} first`, status: "locked" };
   }
 
   const existing = submissions.find((s) => s.task_id === taskId);
@@ -74,7 +74,7 @@ export function isTaskUnlocked(
   }
 
   if (levelStat === "completed") {
-    return { unlocked: false, reason: "Level completed", status: "locked" };
+    return { unlocked: false, reason: "Day completed", status: "locked" };
   }
 
   return { unlocked: true, status: "available" };

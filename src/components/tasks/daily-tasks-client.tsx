@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Target, Trophy, HelpCircle, Lock, Gift, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { TaskCard } from "@/components/tasks/task-card";
-import { TASK_DEFINITIONS, TASK_FAQ, TASK_LEVELS } from "@/lib/tasks/definitions";
+import { TASK_DEFINITIONS, TASK_FAQ, TASK_LEVELS, formatTaskDay } from "@/lib/tasks/definitions";
 import { getLevelUnlockInfo } from "@/lib/tasks/utils";
 import { isLevelReadyToClaim } from "@/lib/tasks/level-progress";
 import { claimLevelReward, type TaskBoardData } from "@/lib/actions/daily-tasks";
@@ -125,7 +125,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
               <div className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
                 <Gift className="h-5 w-5" />
                 <span>
-                  Level {claimableLevel.level} complete — claim your ${claimableMeta.cashReward} reward!
+                  {formatTaskDay(claimableLevel.level)} complete — claim your ${claimableMeta.cashReward} reward!
                 </span>
               </div>
               <button
@@ -139,7 +139,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
               </button>
             </div>
             <p className="text-[11px] text-emerald-300/70 mt-2">
-              Goes to your Bonus wallet. Next level unlocks 24h after you claim.
+              Goes to your Bonus wallet. Next day unlocks 24h after you claim.
             </p>
             {claimFeedback && (
               <p
@@ -201,7 +201,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
                   )}
                 >
                   {isLocked && <Lock className="h-3 w-3" />}
-                  L{lvl.level}
+                  Day {lvl.level}
                   {isActive && !isClaimable && (
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
                   )}
@@ -220,7 +220,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="font-bold text-lg">
-                    Level {levelMeta.level}: {levelMeta.name}
+                    {formatTaskDay(levelMeta.level)}: {levelMeta.name}
                   </h2>
                   <p className="text-xs text-muted-foreground">{levelMeta.subtitle}</p>
                 </div>
@@ -234,20 +234,20 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
                 if (prev?.status === "completed" && !prev.reward_granted) {
                   return (
                     <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
-                      <Lock className="h-3 w-3" /> Claim your Level {selectedLevel - 1} reward to unlock this level
+                      <Lock className="h-3 w-3" /> Claim your {formatTaskDay(selectedLevel - 1)} reward to unlock this day
                     </p>
                   );
                 }
                 if (unlockInfo.waiting) {
                   return (
                     <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> Unlocks in {formatCountdown(unlockInfo.msRemaining)} — one level every 24 hours
+                      <Clock className="h-3 w-3" /> Unlocks in {formatCountdown(unlockInfo.msRemaining)} — one day every 24 hours
                     </p>
                   );
                 }
                 return (
                   <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Complete &amp; claim Level {selectedLevel - 1} to unlock these tasks
+                    <Lock className="h-3 w-3" /> Complete &amp; claim {formatTaskDay(selectedLevel - 1)} to unlock these tasks
                   </p>
                 );
               })()}
@@ -270,7 +270,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
                     </button>
                   </div>
                   <p className="text-[11px] text-emerald-300/70 mt-2">
-                    Reward goes to your Bonus wallet. The next level unlocks 24 hours after you claim.
+                    Reward goes to your Bonus wallet. The next day unlocks 24 hours after you claim.
                   </p>
                 </div>
               )}
@@ -302,7 +302,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
                   className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex justify-between items-center"
                 >
                   <div>
-                    <p className="font-semibold">Level {lvl.level}: {meta?.name}</p>
+                    <p className="font-semibold">{formatTaskDay(lvl.level)}: {meta?.name}</p>
                     <p className="text-xs text-muted-foreground">{lvl.points_earned} points earned</p>
                   </div>
                   <p className="text-xl font-bold text-emerald-400">${meta?.cashReward}</p>
@@ -312,7 +312,7 @@ export function DailyTasksClient({ board, onReload }: DailyTasksClientProps) {
           ) : (
             <div className="text-center py-12 text-muted-foreground rounded-xl border border-white/5 bg-[#161616]">
               <Trophy className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p>Complete Level 1 tasks to earn your first cash reward!</p>
+              <p>Complete Day 1 tasks to earn your first cash reward!</p>
             </div>
           )}
         </div>

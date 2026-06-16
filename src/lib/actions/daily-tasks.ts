@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/actions/notifications";
 import { isTaskUnlocked as checkTaskUnlocked } from "@/lib/tasks/utils";
 import {
+  TASK_DAY_COUNT,
   TASK_LEVELS,
+  formatTaskDay,
   getTaskById,
   type TaskLevelMeta,
 } from "@/lib/tasks/definitions";
@@ -252,7 +254,7 @@ async function creditBonusWalletViaAdmin(
     wallet_type: "bonus",
     transaction_type: "credit",
     source: "daily_task",
-    description: `Level ${level} task reward claimed`,
+    description: `${formatTaskDay(level)} task reward claimed`,
     created_by: userId,
   });
 
@@ -298,7 +300,7 @@ async function tryCompleteLevel(userId: string, level: number) {
 
   await createNotification(
     userId,
-    `Level ${level} complete! 🎉`,
+    `${formatTaskDay(level)} complete! 🎉`,
     `All tasks approved — claim your $${levelMeta.cashReward} reward to your Bonus wallet.`,
     "success"
   );
@@ -379,7 +381,7 @@ async function claimLevelRewardFallback(
       amount,
       "bonus",
       "daily_task",
-      `Level ${level} task reward claimed`
+      `${formatTaskDay(level)} task reward claimed`
     );
     if (rpcWallet.error) {
       await admin
@@ -391,7 +393,7 @@ async function claimLevelRewardFallback(
     }
   }
 
-  if (level < 10) {
+  if (level < TASK_DAY_COUNT) {
     await admin
       .from("user_task_levels")
       .update({ status: "locked" })
@@ -402,7 +404,7 @@ async function claimLevelRewardFallback(
 
   await notifyAdminsInApp(
     "Daily task reward claimed",
-    `${displayName} claimed Level ${level} (${levelName}) — $${amount} to Bonus wallet.`
+    `${displayName} claimed ${formatTaskDay(level)} (${levelName}) — $${amount} to Bonus wallet.`
   );
 
   return { success: true, amount };
@@ -428,11 +430,11 @@ export async function claimLevelReward(level: number) {
   if (!approval.readyToClaim) {
     if (approval.pendingCount > 0) {
       return {
-        error: `${approval.pendingCount} task(s) still awaiting admin approval. Claim unlocks after all Level ${level} tasks are approved.`,
+        error: `${approval.pendingCount} task(s) still awaiting admin approval. Claim unlocks after all ${formatTaskDay(level)} tasks are approved.`,
       };
     }
     return {
-      error: `Finish all Level ${level} tasks and get admin approval first (${approval.approvedCount}/${approval.totalTasks} approved).`,
+      error: `Finish all ${formatTaskDay(level)} tasks and get admin approval first (${approval.approvedCount}/${approval.totalTasks} approved).`,
     };
   }
 
@@ -445,7 +447,7 @@ export async function claimLevelReward(level: number) {
     .eq("level", level)
     .single();
 
-  if (!levelRow) return { error: "Level not found" };
+  if (!levelRow) return { error: "Day not found" };
   if (levelRow.status !== "completed") return { error: "Finish all level tasks first" };
   if (levelRow.reward_granted) return { error: "Reward already claimed" };
 
@@ -477,7 +479,7 @@ export async function claimLevelReward(level: number) {
   } else {
     amount = Number(reward ?? amount);
 
-    if (level < 10) {
+    if (level < TASK_DAY_COUNT) {
       const admin = createAdminClient();
       await admin
         ?.from("user_task_levels")
@@ -489,14 +491,14 @@ export async function claimLevelReward(level: number) {
 
     await notifyAdminsInApp(
       "Daily task reward claimed",
-      `${displayName} claimed Level ${level} (${levelMeta.name}) — $${amount} to Bonus wallet.`
+      `${displayName} claimed ${formatTaskDay(level)} (${levelMeta.name}) — $${amount} to Bonus wallet.`
     );
   }
 
   await createNotification(
     user.id,
     "Reward claimed! 🎉",
-    `$${amount} added to your Bonus wallet. Level ${Math.min(level + 1, 10)} unlocks in 24 hours.`,
+    `$${amount} added to your Bonus wallet. ${level < TASK_DAY_COUNT ? `${formatTaskDay(level + 1)} unlocks in 24 hours.` : "You completed all 7 days!"}`,
     "success"
   );
 

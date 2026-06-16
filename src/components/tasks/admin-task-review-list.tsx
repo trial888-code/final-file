@@ -6,7 +6,7 @@ import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { adminReviewTaskSubmission } from "@/lib/actions/daily-tasks";
-import { getTaskById } from "@/lib/tasks/definitions";
+import { formatTaskDay, getTaskById } from "@/lib/tasks/definitions";
 import { TaskProofImage } from "@/components/tasks/task-proof-image";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -55,7 +55,7 @@ export function AdminTaskReviewList({ submissions }: AdminTaskReviewListProps) {
               <div>
                 <p className="font-semibold">{task?.title ?? sub.task_id}</p>
                 <p className="text-xs text-muted-foreground">
-                  {user?.full_name || user?.email?.split("@")[0] || "Player"} · Level {task?.level} · +
+                  {user?.full_name || user?.email?.split("@")[0] || "Player"} · {task ? formatTaskDay(task.level) : "Day ?"} · +
                   {task?.points} pts · {formatRelativeTime(sub.created_at)}
                 </p>
               </div>

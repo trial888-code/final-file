@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Target, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TaskCard } from "@/components/tasks/task-card";
-import { TASK_DEFINITIONS } from "@/lib/tasks/definitions";
+import { TASK_DEFINITIONS, formatTaskDay } from "@/lib/tasks/definitions";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import type { TaskBoardData } from "@/lib/actions/daily-tasks";
 
@@ -61,7 +61,7 @@ export function DailyTaskPopup({ board, onClose }: DailyTaskPopupProps) {
             Complete tasks, earn points & unlock real cash rewards
           </p>
           <p className="text-sm text-amber-400 font-semibold mt-2">
-            Level {board.activeLevel} active · ${board.availableCashBalance} available to claim
+            {formatTaskDay(board.activeLevel)} active · ${board.availableCashBalance} available to claim
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export function DailyTaskPopup({ board, onClose }: DailyTaskPopupProps) {
             <div className="rounded-xl border border-orange-500/20 bg-[#161616] p-4 space-y-3">
               <p className="text-sm text-white">
                 You have <strong className="text-amber-400">{availableCount} tasks</strong> at
-                Level {board.activeLevel}. Complete them to earn cash rewards.
+                {formatTaskDay(board.activeLevel)}. Complete them to earn cash rewards.
               </p>
               {pendingCount > 0 && (
                 <p className="text-xs text-amber-400">
@@ -96,7 +96,7 @@ export function DailyTaskPopup({ board, onClose }: DailyTaskPopupProps) {
         <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row gap-2 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <Button asChild className="flex-1">
             <Link href="/dashboard/tasks" onClick={handleClose}>
-              View all levels & tasks
+              View all days & tasks
             </Link>
           </Button>
           <Button type="button" variant="outline" onClick={handleClose} className="flex-1">

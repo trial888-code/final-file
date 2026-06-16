@@ -1,4 +1,4 @@
-import { TASK_LEVELS, getTasksForLevel } from "@/lib/tasks/definitions";
+import { TASK_DAY_COUNT, TASK_LEVELS, getTasksForLevel } from "@/lib/tasks/definitions";
 import { TASK_UNLOCK_HOURS } from "@/lib/tasks/utils";
 import type { LevelStatus, TaskSubmission, UserLevelProgress } from "@/lib/tasks/types";
 
@@ -136,7 +136,7 @@ export function resolveActiveLevel(progress: UserLevelProgress[]): number {
   const lastClaimed = [...normalized]
     .reverse()
     .find((p) => p.status === "completed" && p.reward_granted);
-  if (lastClaimed && lastClaimed.level < 10) {
+  if (lastClaimed && lastClaimed.level < TASK_DAY_COUNT) {
     return lastClaimed.level + 1;
   }
 
