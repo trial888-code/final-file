@@ -18,6 +18,8 @@ import {
   isPhoneAvailable,
   signInWithEmailPassword,
 } from "@/lib/actions/auth";
+import { checkSignupAllowed, linkSignupSecurity } from "@/lib/actions/security";
+import { getDeviceId } from "@/lib/security/device-fingerprint";
 
 interface EmailAuthFormProps {
   mode: "login" | "register";
@@ -137,6 +139,15 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       return;
     }
 
+    const normalizedEmail = normalizeEmail(email);
+    const deviceId = await getDeviceId();
+    const signupCheck = await checkSignupAllowed(deviceId, normalizedEmail);
+    if (!signupCheck.allowed) {
+      toast.error(signupCheck.error);
+      setLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       toast.error("Passwords do not match");
       setLoading(false);
@@ -149,7 +160,6 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       return;
     }
 
-    const normalizedEmail = normalizeEmail(email);
     const emailRedirectTo = buildAuthCallbackUrl(
       getEmailAuthOrigin(window.location.origin),
       redirect,
@@ -236,6 +246,8 @@ export function EmailAuthForm({ mode, redirect = "/", referralCodeFromUrl }: Ema
       toast.error(saved.error ?? "Account created but phone was not saved");
       return;
     }
+
+    await linkSignupSecurity(deviceId);
 
     setLoading(false);
     toast.success("Account created! Welcome to Spinora.");

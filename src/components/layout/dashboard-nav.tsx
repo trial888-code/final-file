@@ -21,6 +21,7 @@ import {
   X,
   History,
   Wallet,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedLogo, AnimatedLogoText } from "@/components/ui/animated-logo";
@@ -54,6 +55,7 @@ const adminLinks = [
   { href: "/admin", label: "Admin Panel", icon: Shield },
   { href: "/admin/chat", label: "Customer Chat", icon: MessageSquare },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/fraud", label: "Fraud / Flags", icon: ShieldAlert },
   { href: "/admin/transactions", label: "Transactions", icon: History },
   { href: "/admin/game-loads", label: "Wallet Loads", icon: Banknote },
   { href: "/admin/deposits", label: "Deposits", icon: Wallet },

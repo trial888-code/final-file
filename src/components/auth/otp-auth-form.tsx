@@ -15,6 +15,8 @@ import {
 } from "@/lib/auth/phone";
 import { isEmailIdentifier, normalizeEmail, maskEmail, formatAuthErrorMessage } from "@/lib/auth/identifier";
 import { resolveLoginEmail, isPhoneAvailable, isEmailAvailable, saveUserContactInfo } from "@/lib/actions/auth";
+import { checkSignupAllowed, linkSignupSecurity } from "@/lib/actions/security";
+import { getDeviceId } from "@/lib/security/device-fingerprint";
 
 interface OtpAuthFormProps {
   mode: "login" | "register";
@@ -81,6 +83,14 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
       }
       if (!emailCheck.available) {
         toast.error(emailCheck.error ?? "This email is already registered");
+        setLoading(false);
+        return;
+      }
+
+      const deviceId = await getDeviceId();
+      const signupCheck = await checkSignupAllowed(deviceId, email);
+      if (!signupCheck.allowed) {
+        toast.error(signupCheck.error);
         setLoading(false);
         return;
       }
@@ -176,6 +186,7 @@ export function OtpAuthForm({ mode, redirect = "/", referralCodeFromUrl }: OtpAu
         toast.error(saved.error ?? "Account created but phone was not saved");
         return;
       }
+      await linkSignupSecurity();
     }
 
     setLoading(false);

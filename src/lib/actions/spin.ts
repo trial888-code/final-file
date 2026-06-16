@@ -13,6 +13,7 @@ import {
   type GlobalSpinStats,
 } from "@/lib/spin/prize-engine";
 import { creditUserWallet } from "@/lib/actions/wallet";
+import { assertFreeplayAllowed } from "@/lib/actions/security";
 import { DAILY_SPIN_ENABLED } from "@/lib/constants";
 
 export interface SpinResult {
@@ -151,6 +152,9 @@ export async function spinWheel(): Promise<SpinResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please log in to spin" };
+
+  const freeplay = await assertFreeplayAllowed();
+  if (!freeplay.ok) return { error: freeplay.error };
 
   const status = await getSpinStatus();
   if ("error" in status) return { error: status.error };

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Users, MessageSquare, Star, Target, Banknote, History, Wallet } from "lucide-react";
+import { Users, MessageSquare, Star, Target, Banknote, History, Wallet, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AdminBroadcastNotice } from "@/components/admin/admin-broadcast-notice";
@@ -16,6 +16,7 @@ export default async function AdminPage() {
     { count: reviewCount },
     { count: pendingTasks },
     { count: pendingDeposits },
+    { count: flaggedUsers },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase
@@ -31,10 +32,20 @@ export default async function AdminPage() {
       .from("deposit_requests")
       .select("*", { count: "exact", head: true })
       .in("status", ["pending", "processing"]),
+    supabase
+      .from("fraud_scores")
+      .select("*", { count: "exact", head: true })
+      .or("rewards_blocked.eq.true,blocked.eq.true,manual_review.eq.true,risk_score.gte.50"),
   ]);
 
   const stats = [
     { icon: Users, label: "Total Users", value: userCount || 0, href: "/admin/users" },
+    {
+      icon: ShieldAlert,
+      label: "Flagged Users",
+      value: flaggedUsers || 0,
+      href: "/admin/fraud",
+    },
     {
       icon: Banknote,
       label: "Wallet Loads",
@@ -74,6 +85,9 @@ export default async function AdminPage() {
         </Button>
         <Button variant="outline" asChild className="w-full sm:w-auto">
           <Link href="/admin/users">Manage Users</Link>
+        </Button>
+        <Button variant="outline" asChild className="w-full sm:w-auto">
+          <Link href="/admin/fraud">Fraud / Flags</Link>
         </Button>
         <Button variant="outline" asChild className="w-full sm:w-auto">
           <Link href="/admin/transactions">View Transactions</Link>

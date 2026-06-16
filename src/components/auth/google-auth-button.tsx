@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { getDeviceId } from "@/lib/security/device-fingerprint";
 
 interface GoogleAuthButtonProps {
   redirect?: string;
@@ -26,6 +27,8 @@ export function GoogleAuthButton({
       setLoading(false);
       return;
     }
+
+    await getDeviceId();
 
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     callbackUrl.searchParams.set("redirect", redirect);

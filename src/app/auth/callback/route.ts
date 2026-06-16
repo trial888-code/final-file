@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { syncProfileFromAuthMetadata } from "@/lib/actions/auth";
+import { linkSignupSecurity } from "@/lib/actions/security";
 
 function resolveRedirect(request: NextRequest, type: EmailOtpType | null) {
   const { searchParams } = new URL(request.url);
@@ -68,6 +69,28 @@ export async function GET(request: NextRequest) {
     await syncProfileFromAuthMetadata();
   } catch (err) {
     console.error("auth callback profile sync:", err);
+  }
+
+  if (type === "signup" || searchParams.get("verified") === "1") {
+    try {
+      await linkSignupSecurity();
+    } catch (err) {
+      console.error("auth callback linkSignupSecurity:", err);
+    }
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const created = new Date(user.created_at).getTime();
+      if (Date.now() - created < 5 * 60 * 1000) {
+        try {
+          await linkSignupSecurity();
+        } catch (err) {
+          console.error("auth callback linkSignupSecurity (oauth):", err);
+        }
+      }
+    }
   }
 
   if (referralCode?.trim()) {

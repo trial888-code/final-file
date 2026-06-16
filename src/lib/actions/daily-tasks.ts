@@ -18,6 +18,7 @@ import { notifyAdminOfTaskRewardClaim } from "@/lib/telegram/notify-admin-task-c
 import { createAdminClient } from "@/lib/supabase/admin";
 import { creditUserWallet } from "@/lib/actions/wallet";
 import { isTaskProofStoragePath } from "@/lib/tasks/proof-upload";
+import { assertFreeplayAllowed } from "@/lib/actions/security";
 
 export type { TaskSubmission, UserLevelProgress, TaskSubmissionStatus, LevelStatus } from "@/lib/tasks/types";
 
@@ -416,6 +417,9 @@ export async function claimLevelReward(level: number) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+
+  const freeplay = await assertFreeplayAllowed();
+  if (!freeplay.ok) return { error: freeplay.error };
 
   const levelMeta = TASK_LEVELS.find((l) => l.level === level);
   if (!levelMeta) return { error: "Invalid level" };

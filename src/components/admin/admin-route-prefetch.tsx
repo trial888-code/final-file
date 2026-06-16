@@ -7,6 +7,7 @@ const ADMIN_ROUTES = [
   "/admin",
   "/admin/chat",
   "/admin/users",
+  "/admin/fraud",
   "/admin/transactions",
   "/admin/game-loads",
   "/admin/deposits",
