@@ -30,7 +30,7 @@ import {
 import type { Game } from "@/lib/games";
 import { GAME_BONUS_RULES } from "@/lib/games";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
-import { isAutomatedGameSlug, AUTOMATED_BOT_WORKER_DIR } from "@/lib/game-automation/types";
+import { isAutomatedGameSlug } from "@/lib/game-automation/types";
 import { isGameAccountCreateLoadType } from "@/lib/game-automation/account-create";
 import { WALLET_LOAD_LIMITS } from "@/lib/game-automation/config";
 import {
@@ -765,25 +765,19 @@ export function GameWalletLoadSection({
 
         {anyPending && isAutomatedGameSlug(game.slug) && (
           <p className="text-[11px] text-amber-200/90 text-center leading-relaxed rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-            Bot is processing your request. Keep the {game.name} bot running on your PC (Chrome on
-            agent panel +{" "}
-            <span className="font-mono">workers/{AUTOMATED_BOT_WORKER_DIR[game.slug]}</span>
-            {game.slug === "cash-frenzy" ? " · port 9229" : null}
-            {game.slug === "game-vault" ? " · port 9224" : null}
-            ).
+            Processing…
             {createLoadStuck && activeCreateLoad ? (
               <>
                 {" "}
-                This job looks stuck —{" "}
+                Taking longer than usual —{" "}
                 <button
                   type="button"
                   onClick={() => void handleCancelLoad(activeCreateLoad.id)}
                   disabled={cancellingId === activeCreateLoad.id}
                   className="underline font-semibold text-amber-100 hover:text-white disabled:opacity-50"
                 >
-                  {cancellingId === activeCreateLoad.id ? "Cancelling…" : "Cancel it"}
-                </button>{" "}
-                then try Replace again.
+                  {cancellingId === activeCreateLoad.id ? "Cancelling…" : "Cancel"}
+                </button>
               </>
             ) : null}
           </p>
@@ -1037,21 +1031,15 @@ export function GameWalletLoadSection({
                   {formatRelativeTime(load.created_at)}
                 </span>
               </div>
-              {(load.status === "pending" || load.status === "processing") &&
-                isAutomatedGameSlug(game.slug) && (
-                  <div className="text-muted-foreground mt-1 space-y-1">
-                    <p>
-                      Waiting for bot worker — start{" "}
-                      <span className="font-mono">workers/{AUTOMATED_BOT_WORKER_DIR[game.slug]}</span>{" "}
-                      on your machine if it is not running.
-                    </p>
+              {(load.status === "pending" || load.status === "processing") && (
+                  <div className="mt-1">
                     <button
                       type="button"
                       onClick={() => void handleCancelLoad(load.id)}
                       disabled={cancellingId === load.id}
-                      className="text-amber-300/90 underline hover:text-amber-200 disabled:opacity-50"
+                      className="text-amber-300/90 underline hover:text-amber-200 disabled:opacity-50 text-[11px]"
                     >
-                      {cancellingId === load.id ? "Cancelling…" : "Cancel this request"}
+                      {cancellingId === load.id ? "Cancelling…" : "Cancel"}
                     </button>
                   </div>
                 )}
