@@ -8,7 +8,6 @@ const DASHBOARD_ROUTES = [
   "/dashboard",
   "/dashboard/messages",
   "/dashboard/deposit",
-  "/dashboard/tasks",
   "/spin",
   "/dashboard/vip",
   "/dashboard/referrals",

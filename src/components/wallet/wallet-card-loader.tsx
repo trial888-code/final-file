@@ -42,9 +42,7 @@ export function WalletCardLoader({
   return (
     <WalletCard
       walletBalance={wallet.walletBalance}
-      bonusWallet={wallet.bonusWallet}
       cashoutWallet={wallet.cashoutWallet}
-      bonusRedeemWallet={wallet.bonusRedeemWallet}
       className={className}
     />
   );

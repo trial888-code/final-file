@@ -16,9 +16,7 @@ export function WalletCardWithSync({ initial, className }: WalletCardWithSyncPro
   return (
     <WalletCard
       walletBalance={(wallet ?? initial).walletBalance}
-      bonusWallet={(wallet ?? initial).bonusWallet}
       cashoutWallet={(wallet ?? initial).cashoutWallet}
-      bonusRedeemWallet={(wallet ?? initial).bonusRedeemWallet}
       className={className}
     />
   );

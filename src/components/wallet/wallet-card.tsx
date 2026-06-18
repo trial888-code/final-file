@@ -3,9 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface WalletCardProps {
   walletBalance: number;
-  bonusWallet: number;
   cashoutWallet: number;
-  bonusRedeemWallet: number;
   className?: string;
 }
 
@@ -15,16 +13,12 @@ function formatMoney(amount: number) {
 
 export function WalletCard({
   walletBalance,
-  bonusWallet,
   cashoutWallet,
-  bonusRedeemWallet,
   className,
 }: WalletCardProps) {
   const columns = [
     { label: "Total Deposit", value: walletBalance },
-    { label: "Bonus Wallet", value: bonusWallet },
     { label: "Deposit Redeem", value: cashoutWallet },
-    { label: "Bonus Redeem", value: bonusRedeemWallet },
   ] as const;
 
   return (
@@ -43,7 +37,7 @@ export function WalletCard({
             key={col.label}
             className={cn(
               "flex min-w-0 flex-col items-center text-center px-0.5 sm:px-1",
-              index % 2 === 0 && "border-r border-white/10"
+              index === 0 && "border-r border-white/10"
             )}
           >
             <div className="flex h-9 w-full items-center justify-center">

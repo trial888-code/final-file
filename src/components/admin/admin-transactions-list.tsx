@@ -27,8 +27,6 @@ type WalletFilter = "all" | WalletType;
 
 const FILTER_OPTIONS: { id: WalletFilter; label: string }[] = [
   { id: "all", label: "All wallets" },
-  { id: "bonus", label: "Bonus Wallet" },
-  { id: "bonus_redeem", label: "Bonus Redeem" },
   { id: "current", label: "Total Deposit" },
   { id: "cashout", label: "Deposit Redeem" },
 ];
@@ -39,7 +37,7 @@ export function AdminTransactionsList({
   totalStored,
 }: AdminTransactionsListProps) {
   const [query, setQuery] = useState("");
-  const [walletFilter, setWalletFilter] = useState<WalletFilter>("bonus");
+  const [walletFilter, setWalletFilter] = useState<WalletFilter>("all");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -59,11 +57,6 @@ export function AdminTransactionsList({
       );
     });
   }, [transactions, query, walletFilter]);
-
-  const bonusCount = useMemo(
-    () => transactions.filter((t) => t.wallet_type === "bonus").length,
-    [transactions]
-  );
 
   return (
     <div className="space-y-4">
@@ -93,9 +86,6 @@ export function AdminTransactionsList({
             }}
           >
             {opt.label}
-            {opt.id === "bonus" && bonusCount > 0 && (
-              <span className="ml-1.5 opacity-80">({bonusCount})</span>
-            )}
           </Button>
         ))}
       </div>
@@ -104,7 +94,7 @@ export function AdminTransactionsList({
         <p className="text-sm text-muted-foreground">
           Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"}
           {totalStored != null ? ` · ${totalStored} stored in database` : ""}
-          {query.trim() ? " (filtered)" : walletFilter === "bonus" ? " · bonus wallet" : ""}
+          {query.trim() ? " (filtered)" : ""}
         </p>
         {live && (
           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">

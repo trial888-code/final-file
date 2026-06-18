@@ -31,7 +31,6 @@ const MENU_LINKS = [
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
   { href: "/dashboard/reviews", label: "Reviews", icon: StarHalf },
-  { href: "/dashboard/tasks", label: "Daily Tasks", icon: Target },
   { href: "/spin", label: "Daily Spin", icon: Sparkles },
 ];
 

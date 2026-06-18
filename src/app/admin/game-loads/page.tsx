@@ -26,9 +26,8 @@ export default async function AdminGameLoadsPage() {
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Wallet Loads</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Loads and redeems only — split by <strong className="text-foreground font-medium">Total Deposit</strong>{" "}
-          and <strong className="text-foreground font-medium">Bonus Wallet</strong>. Account creation is
-          not shown here. Updates live when users request loads.
+          Loads and redeems from <strong className="text-foreground font-medium">Total Deposit</strong> only.
+          Account creation is not shown here. Updates live when users request loads.
         </p>
       </div>
 

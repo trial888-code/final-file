@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Headphones, MessageCircle, User, X, Gamepad2, CheckCircle, Target, Banknote } from "lucide-react";
+import { Headphones, MessageCircle, User, X, Gamepad2, CheckCircle, Banknote } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getAdminUnreadMessageCount,
@@ -21,15 +21,11 @@ import {
   CHAT_INCOMING_EVENT,
   GAME_REQUEST_EVENT,
   DEPOSIT_REQUEST_EVENT,
-  TASK_SUBMISSION_EVENT,
   type ChatIncomingDetail,
   type DepositRequestEventDetail,
   type GameRequestEventDetail,
-  type TaskSubmissionEventDetail,
 } from "@/lib/chat/events";
-import { getDepositMethod } from "@/lib/payments/methods";
-import type { DepositPaymentMethodId } from "@/lib/payments/methods";
-import { getTaskById } from "@/lib/tasks/definitions";
+import { getDepositMethod, type DepositPaymentMethodId } from "@/lib/payments/methods";
 import { subscribeToConversationInserts, subscribeToMessageInserts } from "@/lib/chat/subscribe-messages";
 import { UserQuickChat } from "@/components/chat/user-quick-chat";
 import {
@@ -45,14 +41,11 @@ import { ensureUserConversation } from "@/lib/actions/messages";
 import { ensureUserConversationClient } from "@/lib/chat/ensure-user-conversation-client";
 import { messagePreview } from "@/lib/chat/message-preview";
 import type { GameRequest, Message } from "@/types/database";
-import type { TaskSubmission } from "@/lib/tasks/types";
 
 type ActivityPopupKind =
   | "message"
   | "game_request_new"
   | "game_request_update"
-  | "task_submission_new"
-  | "task_submission_review"
   | "deposit_new";
 
 interface ActivityPopup {
@@ -72,11 +65,6 @@ function isOnRequestsPage(path: string | null, adminView: boolean): boolean {
 function isOnDepositsPage(path: string | null, adminView: boolean): boolean {
   if (adminView) return Boolean(path?.startsWith("/admin/deposits"));
   return Boolean(path?.startsWith("/dashboard/deposits"));
-}
-
-function isOnTasksPage(path: string | null, adminView: boolean): boolean {
-  if (adminView) return Boolean(path?.startsWith("/admin/tasks"));
-  return Boolean(path?.startsWith("/dashboard/tasks"));
 }
 
 function isOnChatInboxPage(path: string | null, adminView: boolean): boolean {
@@ -352,98 +340,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   const openGameRequestActivityRef = useRef(openGameRequestActivity);
   openGameRequestActivityRef.current = openGameRequestActivity;
 
-  const openTaskSubmissionActivity = useCallback(
-    async (
-      submission: Pick<TaskSubmission, "id" | "user_id" | "task_id" | "status" | "level">,
-      kind: TaskSubmissionEventDetail["kind"]
-    ) => {
-      const adminView = isAdminRef.current;
-      const path = pathnameRef.current;
-      const task = getTaskById(submission.task_id);
-      const taskTitle = task?.title ?? "Daily task";
-
-      void playMessageNotificationSound();
-
-      const eventDetail: TaskSubmissionEventDetail = { kind, submissionId: submission.id };
-      window.dispatchEvent(
-        new CustomEvent<TaskSubmissionEventDetail>(TASK_SUBMISSION_EVENT, { detail: eventDetail })
-      );
-
-      const href = adminView ? "/admin/tasks" : "/dashboard/tasks";
-      const isNewSubmission = kind === "submitted" || kind === "resubmitted";
-
-      let title = adminView ? "New task submission" : "Task update";
-      let preview = adminView
-        ? `${taskTitle} — Level ${submission.level}`
-        : `"${taskTitle}" was reviewed`;
-
-      if (adminView && isNewSubmission) {
-        const supabase = createClient();
-        if (supabase) {
-          const { data: player } = await supabase
-            .from("profiles")
-            .select("full_name, email")
-            .eq("id", submission.user_id)
-            .single();
-          const name = player?.full_name || player?.email?.split("@")[0] || "Player";
-          title = name;
-          preview =
-            kind === "resubmitted"
-              ? `Resubmitted: ${taskTitle} (Level ${submission.level})`
-              : `Marked done: ${taskTitle} (Level ${submission.level})`;
-        }
-      }
-
-      if (!adminView && kind === "approved") {
-        title = "Task approved! ⭐";
-        preview = `"${taskTitle}" approved — +${task?.points ?? 0} points`;
-      } else if (!adminView && kind === "rejected") {
-        title = "Task needs revision";
-        preview = `"${taskTitle}" — check your proof and try again`;
-      }
-
-      const popupKind: ActivityPopupKind = isNewSubmission
-        ? "task_submission_new"
-        : "task_submission_review";
-
-      if (isOnTasksPage(path, adminView)) {
-        showActivityPopup({
-          id: submission.id,
-          kind: popupKind,
-          title,
-          preview,
-          href,
-          isAdminView: adminView,
-        });
-        return;
-      }
-
-      if (openingActivityRef.current) return;
-      openingActivityRef.current = true;
-
-      try {
-        showActivityPopup({
-          id: submission.id,
-          kind: popupKind,
-          title,
-          preview,
-          href,
-          isAdminView: adminView,
-        });
-
-        router.push(href);
-      } finally {
-        setTimeout(() => {
-          openingActivityRef.current = false;
-        }, 800);
-      }
-    },
-    [router, showActivityPopup]
-  );
-
-  const openTaskSubmissionActivityRef = useRef(openTaskSubmissionActivity);
-  openTaskSubmissionActivityRef.current = openTaskSubmissionActivity;
-
   const openDepositActivity = useCallback(
     async (deposit: {
       id: string;
@@ -695,77 +591,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   }, [isLoggedIn, isAdmin]);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
-
-    const supabase = createClient();
-    if (!supabase || !userIdRef.current) return;
-
-    const userId = userIdRef.current;
-    const channels: ReturnType<typeof supabase.channel>[] = [];
-
-    if (isAdmin) {
-      const insertChannel = supabase
-        .channel(`task-sub-admin-insert-${userId}`)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "user_task_submissions" },
-          (payload) => {
-            const sub = payload.new as TaskSubmission;
-            if (sub.user_id === userId || sub.status !== "pending") return;
-            void openTaskSubmissionActivityRef.current(sub, "submitted");
-          }
-        )
-        .subscribe();
-
-      const updateChannel = supabase
-        .channel(`task-sub-admin-update-${userId}`)
-        .on(
-          "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "user_task_submissions" },
-          (payload) => {
-            const sub = payload.new as TaskSubmission;
-            const old = payload.old as Partial<TaskSubmission>;
-            if (sub.status !== "pending" || old.status === "pending") return;
-            void openTaskSubmissionActivityRef.current(sub, "resubmitted");
-          }
-        )
-        .subscribe();
-
-      channels.push(insertChannel, updateChannel);
-    } else {
-      const userChannel = supabase
-        .channel(`task-sub-user-${userId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "user_task_submissions",
-            filter: `user_id=eq.${userId}`,
-          },
-          (payload) => {
-            const sub = payload.new as TaskSubmission;
-            const old = payload.old as Partial<TaskSubmission>;
-            if (!sub.status || sub.status === old.status) return;
-
-            if (sub.status === "approved") {
-              void openTaskSubmissionActivityRef.current(sub, "approved");
-            } else if (sub.status === "rejected") {
-              void openTaskSubmissionActivityRef.current(sub, "rejected");
-            }
-          }
-        )
-        .subscribe();
-
-      channels.push(userChannel);
-    }
-
-    return () => {
-      for (const ch of channels) supabase.removeChannel(ch);
-    };
-  }, [isLoggedIn, isAdmin]);
-
-  useEffect(() => {
     if (!isLoggedIn || !isAdmin) return;
 
     const supabase = createClient();
@@ -819,9 +644,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
         <Headphones className="h-5 w-5 text-white" />
       );
     }
-    if (item.kind === "task_submission_new" || item.kind === "task_submission_review") {
-      return <Target className="h-5 w-5 text-white" />;
-    }
     if (item.kind === "deposit_new") {
       return <Banknote className="h-5 w-5 text-white" />;
     }
@@ -834,9 +656,6 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
   function popupActionLabel(item: ActivityPopup) {
     if (item.kind === "message") return "Tap to open chat";
     if (item.kind === "deposit_new") return "Tap to review deposit";
-    if (item.kind === "task_submission_new" || item.kind === "task_submission_review") {
-      return item.isAdminView ? "Tap to review task" : "Tap to view tasks";
-    }
     return "Tap to view request";
   }
 
@@ -931,8 +750,8 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
           aria-label={
             popup.kind === "message"
               ? "Open chat"
-              : popup.kind.startsWith("task_")
-                ? "Open daily tasks"
+              : popup.kind === "deposit_new"
+                ? "Open deposits"
                 : "Open game request"
           }
         >

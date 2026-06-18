@@ -185,18 +185,7 @@ export async function resolveDepositRedeemForJob(
   gameBalance: number
 ): Promise<number> {
   if (job.wallet_type === "bonus") {
-    const rollover = await fetchActiveWalletRollover(supabase, job.user_id, job.game_slug, "bonus");
-    const resolved = resolveWalletRedeemAmount({
-      gameBalance,
-      requestedAmount: Number(job.amount),
-      redeemAll: Boolean(job.redeem_all),
-      rollover,
-      minMult: BONUS_REDEEM_MIN_MULT,
-      maxMult: BONUS_REDEEM_MAX_MULT,
-      loadLabel: "bonus load",
-    });
-    if ("error" in resolved) throw new Error(resolved.error);
-    return resolved.amount;
+    throw new Error("Bonus wallet redeems are no longer supported.");
   }
 
   if (job.wallet_type !== "current") {

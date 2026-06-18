@@ -22,7 +22,7 @@ export default async function AdminTransactionsPage() {
         <h1 className="text-2xl sm:text-3xl font-bold">Transaction Management</h1>
         <p className="text-muted-foreground text-sm sm:text-base">
           Pick one user — see their <strong className="text-foreground font-medium">Total Deposit</strong>{" "}
-          and <strong className="text-foreground font-medium">Bonus Wallet</strong> history in one view.
+          and <strong className="text-foreground font-medium">Deposit Redeem</strong> history.
           Only money loads & redeems (not account creation). Updates live.
         </p>
         {"error" in result && (

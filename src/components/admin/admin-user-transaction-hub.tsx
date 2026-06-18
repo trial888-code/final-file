@@ -216,33 +216,23 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
           </Card>
 
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground font-medium">Total Deposit</strong> — loads & redeems
-            from the deposit wallet only.{" "}
-            <strong className="text-foreground font-medium">Bonus Wallet</strong> — bonus loads,
-            daily tasks, spin prizes, and bonus admin adjustments.
+            <strong className="text-foreground font-medium">Total Deposit</strong> — game loads and
+            redeems from the deposit wallet.
           </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <WalletColumn
-              title="Total Deposit"
-              icon={Wallet}
-              transactions={userTransactions.deposit}
-              emptyHint="No deposit-wallet loads or redeems yet for this user."
-            />
-            <WalletColumn
-              title="Bonus Wallet"
-              icon={Gift}
-              transactions={userTransactions.bonus}
-              emptyHint="No bonus wallet activity yet (loads, daily tasks, spin prizes)."
-            />
-          </div>
+          <WalletColumn
+            title="Total Deposit"
+            icon={Wallet}
+            transactions={userTransactions.deposit}
+            emptyHint="No deposit-wallet loads or redeems yet for this user."
+          />
         </>
       ) : (
         <Card className="p-10 text-center">
           <User className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
           <p className="font-medium">Select a user above</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-            One user at a time — see their Total Deposit and Bonus Wallet history side by side.
+            One user at a time — see their Total Deposit transaction history.
           </p>
         </Card>
       )}

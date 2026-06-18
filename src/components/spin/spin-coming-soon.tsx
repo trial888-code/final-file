@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Sparkles, Target } from "lucide-react";
+import { Clock, Sparkles } from "lucide-react";
 import { SITE_NAME } from "@/lib/constants";
 
 export function SpinComingSoon() {
@@ -20,7 +20,7 @@ export function SpinComingSoon() {
         <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4">Daily Spin Wheel</h1>
         <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-lg mx-auto mb-8">
           We&apos;re building a new daily spin experience for {SITE_NAME} members — free spins,
-          bonus wallet prizes, and VIP rewards. Check back soon.
+          Total Deposit prizes, and VIP rewards. Check back soon.
         </p>
 
         <div className="rounded-2xl border border-white/10 bg-[#12121f]/80 backdrop-blur-sm p-6 text-left mb-8">
@@ -29,8 +29,7 @@ export function SpinComingSoon() {
             <div>
               <p className="font-semibold text-white text-sm">Spin is temporarily unavailable</p>
               <p className="text-sm text-muted-foreground mt-1">
-                You can still earn bonus cash today through Daily Tasks — complete a level, claim
-                your reward, and the next level unlocks after 24 hours.
+                Make a deposit and load your favorite games while we finish the new spin wheel.
               </p>
             </div>
           </div>
@@ -38,17 +37,16 @@ export function SpinComingSoon() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            href="/dashboard/tasks"
+            href="/#games"
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-3 text-sm font-bold text-black hover:opacity-90 transition-opacity"
           >
-            <Target className="h-4 w-4" />
-            Open Daily Tasks
+            Browse Games
           </Link>
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors"
           >
-            Browse Games
+            Go to Dashboard
           </Link>
         </div>
       </div>

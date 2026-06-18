@@ -13,11 +13,6 @@ import {
   DEPOSIT_LOAD_TYPES,
   type DepositRolloverBounds,
 } from "@/lib/wallet/deposit-redeem-rollover";
-import {
-  bonusRolloverBounds,
-  BONUS_LOAD_TYPES,
-  type BonusRolloverBounds,
-} from "@/lib/wallet/bonus-redeem-rollover";
 
 export async function requestGameAccountCreate(input: {
   gameSlug: string;
@@ -203,6 +198,10 @@ export async function requestGameLoad(input: {
     return { error: "Create your game account first." };
   }
 
+  if (input.walletType !== "current") {
+    return { error: "Loads must use Total Deposit wallet." };
+  }
+
   const { data: pending } = await supabase
     .from("game_load_requests")
     .select("id")
@@ -219,7 +218,7 @@ export async function requestGameLoad(input: {
     p_game_slug: input.gameSlug,
     p_game_name: input.gameName,
     p_amount: amount,
-    p_wallet_type: input.walletType,
+    p_wallet_type: "current",
     p_load_type: "load",
     p_game_username: input.gameUsername.trim(),
   });
@@ -281,99 +280,44 @@ export async function requestGameRedeem(input: {
     return { error: "Create your game account first." };
   }
 
-  const walletType = input.walletType ?? "current";
+  const walletType = "current" as const;
 
   const depositRollover = await fetchActiveDepositRolloverForUser(
     supabase,
     user.id,
     input.gameSlug
   );
-  const bonusRollover = await fetchActiveBonusRolloverForUser(
-    supabase,
-    user.id,
-    input.gameSlug
-  );
-  const hasDepositLoad = depositRollover.activeDepositAmount > 0;
-  const hasBonusLoad = bonusRollover.activeBonusLoadAmount > 0;
+  const bounds = depositRolloverBounds(depositRollover);
 
-  if (walletType === "current") {
-    if (!hasDepositLoad) {
+  if (bounds.activeDepositAmount > 0) {
+    const lastBalance = await fetchLastGameBalanceForUser(supabase, user.id, input.gameSlug);
+
+    if (lastBalance === null) {
       return {
-        error: hasBonusLoad
-          ? "You loaded from your bonus wallet — redeem to Bonus Redeem only (7x–15x rules)."
-          : "Load credits from Total Deposit into this game before redeeming to Deposit Redeem.",
+        error: `Check your live game balance first — you need at least $${bounds.minGameBalance.toFixed(2)} in game (3x your $${bounds.activeDepositAmount.toFixed(2)} deposit) to redeem.`,
       };
     }
 
-    const bounds = depositRolloverBounds(depositRollover);
-
-    if (bounds.activeDepositAmount > 0) {
-      const lastBalance = await fetchLastGameBalanceForUser(supabase, user.id, input.gameSlug);
-
-      if (lastBalance === null) {
-        return {
-          error: `Check your live game balance first — you need at least $${bounds.minGameBalance.toFixed(2)} in game (3x your $${bounds.activeDepositAmount.toFixed(2)} deposit) to redeem.`,
-        };
-      }
-
-      if (lastBalance < bounds.minGameBalance) {
-        return {
-          error: `Need at least $${bounds.minGameBalance.toFixed(2)} in game (3x your $${bounds.activeDepositAmount.toFixed(2)} deposit). Last checked: $${lastBalance.toFixed(2)}.`,
-        };
-      }
-
-      if (bounds.maxRedeemRemaining <= 0) {
-        return { error: "You have reached the 8x redeem limit for this deposit." };
-      }
-
-      if (!redeemAll) {
-        const amount = Math.round((input.amount ?? 0) * 100) / 100;
-        if (amount > bounds.maxRedeemRemaining) {
-          return {
-            error: `Maximum redeem is $${bounds.maxRedeemRemaining.toFixed(2)} (8x this deposit minus prior redeems).`,
-          };
-        }
-      }
-    }
-  } else if (walletType === "bonus") {
-    if (!hasBonusLoad) {
+    if (lastBalance < bounds.minGameBalance) {
       return {
-        error: hasDepositLoad
-          ? "You loaded from Total Deposit — redeem to Deposit Redeem only (3x–8x rules)."
-          : "Load credits from your bonus wallet into this game before redeeming to Bonus Redeem.",
+        error: `Need at least $${bounds.minGameBalance.toFixed(2)} in game (3x your $${bounds.activeDepositAmount.toFixed(2)} deposit). Last checked: $${lastBalance.toFixed(2)}.`,
       };
     }
 
-    const bounds = bonusRolloverBounds(bonusRollover);
+    if (bounds.maxRedeemRemaining <= 0) {
+      return { error: "You have reached the 8x redeem limit for this deposit." };
+    }
 
-    if (bounds.activeDepositAmount > 0) {
-      const lastBalance = await fetchLastGameBalanceForUser(supabase, user.id, input.gameSlug);
-
-      if (lastBalance === null) {
+    if (!redeemAll) {
+      const amount = Math.round((input.amount ?? 0) * 100) / 100;
+      if (amount > bounds.maxRedeemRemaining) {
         return {
-          error: `Check your live game balance first — you need at least $${bounds.minGameBalance.toFixed(2)} in game (7x your $${bounds.activeDepositAmount.toFixed(2)} bonus load) to redeem.`,
+          error: `Maximum redeem is $${bounds.maxRedeemRemaining.toFixed(2)} (8x this deposit minus prior redeems).`,
         };
-      }
-
-      if (lastBalance < bounds.minGameBalance) {
-        return {
-          error: `Need at least $${bounds.minGameBalance.toFixed(2)} in game (7x your $${bounds.activeDepositAmount.toFixed(2)} bonus load). Last checked: $${lastBalance.toFixed(2)}.`,
-        };
-      }
-
-      if (bounds.maxRedeemRemaining <= 0) {
-        return { error: "You have reached the 15x redeem limit for this bonus load." };
-      }
-
-      if (!redeemAll) {
-        const amount = Math.round((input.amount ?? 0) * 100) / 100;
-        if (amount > bounds.maxRedeemRemaining) {
-          return {
-            error: `Maximum redeem is $${bounds.maxRedeemRemaining.toFixed(2)} (15x this bonus load minus prior redeems).`,
-          };
-        }
       }
     }
+  } else {
+    return { error: "Load credits from Total Deposit into this game before redeeming." };
   }
 
   const { data: pending } = await supabase
@@ -400,7 +344,7 @@ export async function requestGameRedeem(input: {
   if (error) {
     if (error.message.includes("request_game_redeem")) {
       return {
-        error: "Run supabase/deposit-redeem-rollover.sql and supabase/bonus-redeem-rollover.sql in Supabase SQL Editor first.",
+        error: "Run supabase/deposit-redeem-rollover.sql in Supabase SQL Editor first.",
       };
     }
     return { error: error.message };
@@ -458,41 +402,6 @@ async function fetchActiveDepositRolloverForUser(
     "current",
     DEPOSIT_LOAD_TYPES
   );
-}
-
-async function fetchActiveBonusRolloverForUser(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  gameSlug: string
-) {
-  const { data, error } = await supabase.rpc("get_bonus_rollover_totals", {
-    p_user_id: userId,
-    p_game_slug: gameSlug,
-  });
-
-  if (!error && data?.length) {
-    const row = data[0] as {
-      active_load_amount?: number;
-      redeemed_since_active?: number;
-    };
-    return {
-      activeBonusLoadAmount: Number(row.active_load_amount ?? 0),
-      redeemedSinceActiveBonusLoad: Number(row.redeemed_since_active ?? 0),
-    };
-  }
-
-  const fallback = await fetchActiveWalletRolloverFallback(
-    supabase,
-    userId,
-    gameSlug,
-    "bonus",
-    BONUS_LOAD_TYPES
-  );
-
-  return {
-    activeBonusLoadAmount: fallback.activeDepositAmount,
-    redeemedSinceActiveBonusLoad: fallback.redeemedSinceActiveDeposit,
-  };
 }
 
 async function fetchActiveWalletRolloverFallback(
@@ -573,19 +482,6 @@ export async function getDepositRolloverForGame(
 
   const rollover = await fetchActiveDepositRolloverForUser(supabase, user.id, gameSlug);
   return depositRolloverBounds(rollover);
-}
-
-export async function getBonusRolloverForGame(
-  gameSlug: string
-): Promise<BonusRolloverBounds | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const rollover = await fetchActiveBonusRolloverForUser(supabase, user.id, gameSlug);
-  return bonusRolloverBounds(rollover);
 }
 
 export async function getMyGameLoads(gameSlug?: string) {

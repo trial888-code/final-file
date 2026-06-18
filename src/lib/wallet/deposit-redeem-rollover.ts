@@ -57,7 +57,7 @@ export function resolveDepositRedeemAmount(input: {
     return {
       ok: false,
       error:
-        "No deposit load on this game account. Redeem to Bonus Redeem if you loaded from your bonus wallet.",
+        "No deposit load on this game account. Load from Total Deposit first.",
     };
   }
 

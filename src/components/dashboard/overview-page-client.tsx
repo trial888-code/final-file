@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Target, Crown, Users, Bell, Star } from "lucide-react";
+import { Crown, Users, Bell, Star, Gamepad2 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardRouteLoading } from "@/components/dashboard/dashboard-route-loading";
 import { ReviewsPreviewClient } from "@/components/dashboard/reviews-preview-client";
@@ -15,7 +15,6 @@ import { useDashboardProfile } from "@/lib/dashboard/dashboard-profile-context";
 import { VIP_TIERS } from "@/lib/constants";
 
 interface OverviewStats {
-  tasksCompleted: number;
   referralCount: number;
   notifCount: number;
   reviewCount: number;
@@ -30,7 +29,6 @@ export function OverviewPageClient() {
   const [stats, setStats] = useState<OverviewStats | null>(() => {
     if (!dashboardProfile) return null;
     return {
-      tasksCompleted: 0,
       referralCount: 0,
       notifCount: 0,
       reviewCount: 0,
@@ -47,11 +45,6 @@ export function OverviewPageClient() {
 
     void Promise.all([
       supabase
-        .from("user_task_levels")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("reward_granted", true),
-      supabase
         .from("referrals")
         .select("*", { count: "exact", head: true })
         .eq("referrer_id", userId),
@@ -61,10 +54,9 @@ export function OverviewPageClient() {
         .eq("user_id", userId)
         .eq("is_read", false),
       supabase.from("reviews").select("*", { count: "exact", head: true }),
-    ]).then(([reqRes, refRes, notifRes, reviewRes]) => {
+    ]).then(([refRes, notifRes, reviewRes]) => {
       if (cancelled) return;
       setStats((prev) => ({
-        tasksCompleted: reqRes.count ?? 0,
         referralCount: refRes.count ?? 0,
         notifCount: notifRes.count ?? 0,
         reviewCount: reviewRes.count ?? 0,
@@ -88,7 +80,7 @@ export function OverviewPageClient() {
   const progress = nextTier ? (stats.vipPoints / nextTier.minPoints) * 100 : 100;
 
   const statCards = [
-    { icon: Target, label: "Task Rewards Claimed", value: stats.tasksCompleted, href: "/dashboard/tasks" },
+    { icon: Gamepad2, label: "Browse Games", value: "Play", href: "/#games" },
     { icon: Crown, label: "VIP Tier", value: currentTier?.name || "Bronze", href: "/dashboard/vip" },
     { icon: Users, label: "Referrals", value: stats.referralCount, href: "/dashboard/referrals" },
     { icon: Star, label: "Reviews", value: stats.reviewCount, href: "/dashboard/reviews" },
@@ -155,8 +147,8 @@ export function OverviewPageClient() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/dashboard/tasks" prefetch={false}>
-                Open Daily Tasks
+              <Link href="/#games" prefetch={false}>
+                Browse Games
               </Link>
             </Button>
             <Button variant="outline" asChild>
@@ -178,9 +170,7 @@ export function OverviewPageClient() {
         </Card>
       </div>
 
-      <div className="mt-6">
-        <ReviewsPreviewClient />
-      </div>
+      <ReviewsPreviewClient />
     </div>
   );
 }

@@ -60,7 +60,8 @@ export function categorizeAdminTransactionPanel(tx: {
 }): "deposit" | "bonus" {
   const { source, wallet_type } = tx;
 
-  if (source === "daily_task" || source === "spin") return "bonus";
+  if (source === "spin") return "deposit";
+  if (source === "daily_task") return "bonus";
 
   if (wallet_type === "bonus" || wallet_type === "bonus_redeem") return "bonus";
 

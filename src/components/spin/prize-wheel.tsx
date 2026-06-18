@@ -136,7 +136,7 @@ export function PrizeWheel({
         if (result.prize!.type === "luck") {
           toast.info(`${result.prize!.emoji} ${result.prize!.label} — Next spin in 24 hours.`);
         } else {
-          toast.success(`${result.prize!.emoji} You won ${result.prize!.label}! Added to Bonus Wallet.`);
+          toast.success(`${result.prize!.emoji} You won ${result.prize!.label}! Added to Total Deposit.`);
         }
         onSpinComplete(result.remainingSpins ?? 0, result.nextFreeSpinMs);
         if (result.remainingSpins === 0 && result.nextFreeSpinMs) {

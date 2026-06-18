@@ -48,7 +48,6 @@ const userLinks = [
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
   { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-  { href: "/dashboard/tasks", label: "Daily Tasks", icon: Target },
 ];
 
 const adminLinks = [
@@ -61,7 +60,6 @@ const adminLinks = [
   { href: "/admin/deposits", label: "Deposits", icon: Wallet },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/tasks", label: "Task Review", icon: Target },
 ];
 
 const ALL_NAV_ROUTES = [

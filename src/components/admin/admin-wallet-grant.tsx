@@ -18,7 +18,7 @@ interface AdminWalletGrantProps {
 
 export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
   const [amount, setAmount] = useState("5");
-  const [walletType, setWalletType] = useState<WalletType>("bonus");
+  const [walletType, setWalletType] = useState<WalletType>("current");
   const [loading, setLoading] = useState<string | null>(null);
   const router = useRouter();
 
@@ -89,10 +89,8 @@ export function AdminWalletGrant({ userId }: AdminWalletGrantProps) {
             onChange={(e) => setWalletType(e.target.value as WalletType)}
             className="h-8 rounded-md border border-border bg-background px-2 text-sm"
           >
-            <option value="bonus">Bonus</option>
             <option value="current">Total Deposit</option>
             <option value="cashout">Deposit Redeem</option>
-            <option value="bonus_redeem">Bonus Redeem</option>
           </select>
         </div>
         <Button size="sm" variant="outline" onClick={handleGrant} disabled={!!loading}>

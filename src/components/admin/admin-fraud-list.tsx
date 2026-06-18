@@ -45,7 +45,7 @@ export function AdminFraudList({ users }: AdminFraudListProps) {
       toast.error(result.error);
       return;
     }
-    toast.success("User restored — spin and daily task rewards enabled");
+    toast.success("User restored — spin rewards enabled");
     router.refresh();
   }
 

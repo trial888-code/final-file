@@ -24,12 +24,11 @@ import {
   getMyGameLoads,
   getMyGameAccount,
   getDepositRolloverForGame,
-  getBonusRolloverForGame,
   healStaleGameLoads,
   cancelMyGameLoad,
 } from "@/lib/actions/game-loads";
 import type { Game } from "@/lib/games";
-import { GAME_BONUS_RULES, GAME_BONUS_REDEEM_RULES } from "@/lib/games";
+import { GAME_BONUS_RULES } from "@/lib/games";
 import type { GameLoadRequest } from "@/lib/game-automation/types";
 import { isAutomatedGameSlug, AUTOMATED_BOT_WORKER_DIR } from "@/lib/game-automation/types";
 import { isGameAccountCreateLoadType } from "@/lib/game-automation/account-create";
@@ -68,12 +67,9 @@ export function GameWalletLoadSection({
   const supabase = useMemo(() => createClient(), []);
 
   const [walletBalance, setWalletBalance] = useState(0);
-  const [bonusBalance, setBonusBalance] = useState(0);
   const [amount, setAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAmount, setRedeemAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAll, setRedeemAll] = useState(false);
-  const [walletType, setWalletType] = useState<"current" | "bonus">("bonus");
-  const [redeemWalletType, setRedeemWalletType] = useState<"current" | "bonus">("bonus");
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
@@ -99,7 +95,6 @@ export function GameWalletLoadSection({
   const [showPassword, setShowPassword] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [depositRollover, setDepositRollover] = useState<DepositRolloverBounds | null>(null);
-  const [bonusRollover, setBonusRollover] = useState<DepositRolloverBounds | null>(null);
   const failedToastRef = useRef<string | null>(null);
   const pendingJobIdsRef = useRef<Set<string>>(new Set());
   const failedToastShownRef = useRef<Set<string>>(new Set());
@@ -116,13 +111,12 @@ export function GameWalletLoadSection({
 
     const { data } = await supabase
       .from("profiles")
-      .select("wallet_balance, bonus_wallet, full_name, email")
+      .select("wallet_balance, full_name, email")
       .eq("id", user.id)
       .single();
 
     if (data) {
       setWalletBalance(Number(data.wallet_balance ?? 0));
-      setBonusBalance(Number(data.bonus_wallet ?? 0));
       setRequesterName(data.full_name ?? null);
       setRequesterEmail(data.email ?? null);
     }
@@ -292,45 +286,17 @@ export function GameWalletLoadSection({
   }, [anyPending, refreshLoads, game.slug]);
 
   useEffect(() => {
-    const bal = walletType === "current" ? walletBalance : bonusBalance;
-    if (bal > 0) {
-      const suggested = Math.min(bal, WALLET_LOAD_LIMITS.max);
+    if (walletBalance > 0) {
+      const suggested = Math.min(walletBalance, WALLET_LOAD_LIMITS.max);
       setAmount(String(Math.round(suggested * 100) / 100));
     }
-  }, [walletType, walletBalance, bonusBalance]);
+  }, [walletBalance]);
 
   useEffect(() => {
     void getDepositRolloverForGame(game.slug).then((stats) => setDepositRollover(stats));
-    void getBonusRolloverForGame(game.slug).then((stats) => setBonusRollover(stats));
   }, [game.slug, recentLoads]);
 
-  const hasDepositLoad = (depositRollover?.activeDepositAmount ?? 0) > 0;
-  const hasBonusLoad = (bonusRollover?.activeDepositAmount ?? 0) > 0;
-  const canRedeemToDeposit = hasDepositLoad;
-  const canRedeemToBonus = hasBonusLoad;
-  const canRedeem = canRedeemToDeposit || canRedeemToBonus;
-
-  useEffect(() => {
-    if (canRedeemToBonus && !canRedeemToDeposit) {
-      setRedeemWalletType("bonus");
-      return;
-    }
-    if (canRedeemToDeposit && !canRedeemToBonus) {
-      setRedeemWalletType("current");
-      return;
-    }
-    if (canRedeemToDeposit && canRedeemToBonus) {
-      const lastCompletedLoad = recentLoads.find(
-        (l) =>
-          (l.load_type === "load" || l.load_type === "reload") && l.status === "completed"
-      );
-      if (lastCompletedLoad?.wallet_type === "bonus" || lastCompletedLoad?.wallet_type === "current") {
-        setRedeemWalletType(lastCompletedLoad.wallet_type);
-      }
-    }
-  }, [canRedeemToDeposit, canRedeemToBonus, recentLoads]);
-
-  const available = walletType === "current" ? walletBalance : bonusBalance;
+  const available = walletBalance;
   const parsedAmount = parseFloat(amount) || 0;
   const previewStem = previewJuwaUsername(requesterName, requesterEmail);
   const usesNumberedAccounts =
@@ -352,23 +318,15 @@ export function GameWalletLoadSection({
   const lastKnownBalance = lastBalanceCheck ? Number(lastBalanceCheck.amount) : null;
   const parsedRedeemAmount = parseFloat(redeemAmount) || 0;
 
-  const activeRedeemRollover =
-    redeemWalletType === "current" ? depositRollover : bonusRollover;
+  const activeRedeemRollover = depositRollover;
 
-  const redeemMinMult =
-    redeemWalletType === "current"
-      ? GAME_BONUS_RULES.redeemMin
-      : GAME_BONUS_REDEEM_RULES.redeemMin;
-
-  const redeemMaxMult =
-    redeemWalletType === "current"
-      ? GAME_BONUS_RULES.redeemMax
-      : GAME_BONUS_REDEEM_RULES.redeemMax;
-
-  const loadLabel = redeemWalletType === "current" ? "deposit" : "bonus load";
+  const redeemMinMult = GAME_BONUS_RULES.redeemMin;
+  const redeemMaxMult = GAME_BONUS_RULES.redeemMax;
+  const loadLabel = "deposit";
 
   const redeemRulesActive =
     activeRedeemRollover !== null && activeRedeemRollover.activeDepositAmount > 0;
+  const canRedeem = redeemRulesActive;
 
   const redeemMaxAllowed = redeemRulesActive
     ? Math.min(WALLET_LOAD_LIMITS.max, activeRedeemRollover!.maxRedeemRemaining)
@@ -524,7 +482,7 @@ export function GameWalletLoadSection({
       gameSlug: game.slug,
       gameName: game.name,
       amount: parsedAmount,
-      walletType,
+      walletType: "current",
       gameUsername: savedAccount.game_username,
     });
 
@@ -543,12 +501,8 @@ export function GameWalletLoadSection({
       return;
     }
 
-    if (redeemWalletType === "current" && !canRedeemToDeposit) {
-      toast.error("You loaded from your bonus wallet — redeem to Bonus Redeem only.");
-      return;
-    }
-    if (redeemWalletType === "bonus" && !canRedeemToBonus) {
-      toast.error("You loaded from Total Deposit — redeem to Deposit Redeem only.");
+    if (!canRedeem) {
+      toast.error("Load credits from Total Deposit into this game before redeeming.");
       return;
     }
 
@@ -586,10 +540,10 @@ export function GameWalletLoadSection({
       amount: redeemAll ? undefined : parsedRedeemAmount,
       redeemAll,
       gameUsername: savedAccount.game_username,
-      walletType: redeemWalletType,
+      walletType: "current",
     });
 
-    const destLabel = redeemWalletType === "bonus" ? "Bonus Redeem" : "Deposit Redeem";
+    const destLabel = "Deposit Redeem";
     if (result.error) toast.error(result.error);
     else {
       toast.success(
@@ -909,19 +863,11 @@ export function GameWalletLoadSection({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="rounded-xl border border-white/10 bg-[#242424]/80 px-4 py-3.5 sm:px-5 sm:py-4">
-            <span className="text-xs sm:text-sm text-muted-foreground">Total Deposit</span>
-            <p className="mt-1 text-xl sm:text-2xl font-bold text-white tabular-nums">
-              ${walletBalance.toFixed(2)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-[#242424]/80 px-4 py-3.5 sm:px-5 sm:py-4">
-            <span className="text-xs sm:text-sm text-muted-foreground">Bonus wallet</span>
-            <p className="mt-1 text-xl sm:text-2xl font-bold text-emerald-300 tabular-nums">
-              ${bonusBalance.toFixed(2)}
-            </p>
-          </div>
+        <div className="rounded-xl border border-white/10 bg-[#242424]/80 px-4 py-3.5 sm:px-5 sm:py-4">
+          <span className="text-xs sm:text-sm text-muted-foreground">Total Deposit</span>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-white tabular-nums">
+            ${walletBalance.toFixed(2)}
+          </p>
         </div>
 
         {fundsTab === "load" ? (
@@ -929,24 +875,9 @@ export function GameWalletLoadSection({
             <p className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Load Credits
             </p>
-
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              {(["current", "bonus"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setWalletType(type)}
-                  className={cn(
-                    "rounded-xl py-3 sm:py-3.5 px-3 text-sm sm:text-base font-semibold border transition-colors",
-                    walletType === type
-                      ? "border-orange-500/50 bg-orange-500/15 text-orange-200"
-                      : "border-white/10 bg-[#2a2a2a] text-muted-foreground hover:border-white/20 hover:text-white"
-                  )}
-                >
-                  {type === "current" ? "Total Deposit" : "Bonus wallet"}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Load from your Total Deposit balance into {game.name}.
+            </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -987,67 +918,19 @@ export function GameWalletLoadSection({
               Redeem Credits
             </p>
             <p className="text-sm text-muted-foreground">
-              Pull credits from your {game.name} account back to your Spinora wallet.
+              Pull credits from your {game.name} account to your Deposit Redeem wallet.
             </p>
 
-            <div
-              className={cn(
-                "grid gap-2 sm:gap-3",
-                canRedeemToDeposit && canRedeemToBonus ? "grid-cols-2" : "grid-cols-1"
-              )}
-            >
-              {canRedeemToDeposit && (
-                <button
-                  type="button"
-                  onClick={() => setRedeemWalletType("current")}
-                  className={cn(
-                    "rounded-xl py-3 sm:py-3.5 px-3 text-sm sm:text-base font-semibold border transition-colors",
-                    redeemWalletType === "current"
-                      ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
-                      : "border-white/10 bg-[#2a2a2a] text-muted-foreground hover:border-white/20 hover:text-white"
-                  )}
-                >
-                  To Deposit Redeem
-                </button>
-              )}
-              {canRedeemToBonus && (
-                <button
-                  type="button"
-                  onClick={() => setRedeemWalletType("bonus")}
-                  className={cn(
-                    "rounded-xl py-3 sm:py-3.5 px-3 text-sm sm:text-base font-semibold border transition-colors",
-                    redeemWalletType === "bonus"
-                      ? "border-amber-500/50 bg-amber-500/15 text-amber-200"
-                      : "border-white/10 bg-[#2a2a2a] text-muted-foreground hover:border-white/20 hover:text-white"
-                  )}
-                >
-                  To Bonus Redeem
-                </button>
-              )}
-            </div>
-
-            {canRedeemToBonus && !canRedeemToDeposit && (
-              <p className="text-xs text-muted-foreground">
-                Bonus wallet loads redeem to Bonus Redeem only (7x–15x rules).
-              </p>
-            )}
-            {canRedeemToDeposit && !canRedeemToBonus && (
-              <p className="text-xs text-muted-foreground">
-                Total Deposit loads redeem to Deposit Redeem only (3x–8x rules).
-              </p>
-            )}
             {!canRedeem && savedAccount && (
               <p className="text-xs text-amber-400/90">
-                Load credits into this game first — redeem destination matches the wallet you loaded from.
+                Load credits from Total Deposit into this game first, then redeem at {redeemMinMult}x–{redeemMaxMult}x.
               </p>
             )}
 
             {redeemRulesActive && activeRedeemRollover && (
               <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90 space-y-1">
                 <p className="font-semibold text-amber-200">
-                  {redeemWalletType === "current"
-                    ? "Deposit redeem rollover (this deposit load)"
-                    : "Bonus redeem rollover (this bonus load)"}
+                  Deposit redeem rollover (this deposit load)
                 </p>
                 <p>
                   Last {loadLabel} ${activeRedeemRollover.activeDepositAmount.toFixed(2)} → need{" "}

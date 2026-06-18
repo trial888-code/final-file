@@ -203,7 +203,7 @@ export async function spinWheel(): Promise<SpinResult> {
     await creditUserWallet(
       user.id,
       prize.value,
-      "bonus",
+      "current",
       "spin",
       `Wheel prize: ${prize.label}`
     );
@@ -211,7 +211,7 @@ export async function spinWheel(): Promise<SpinResult> {
     await createNotification(
       user.id,
       "Wheel Prize Won!",
-      `You won ${prize.label}! $${prize.value} added to your Bonus Wallet and +${pointsToAdd} VIP points.`,
+      `You won ${prize.label}! $${prize.value} added to your Total Deposit and +${pointsToAdd} VIP points.`,
       "success"
     );
   }

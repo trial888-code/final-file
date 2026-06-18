@@ -10,7 +10,7 @@ import { GameLoadActions } from "@/components/admin/game-load-actions";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
 import type { GameLoadRequest, GameLoadStatus } from "@/lib/game-automation/types";
-import { Search, Radio, User, X, Wallet, Gift } from "lucide-react";
+import { Search, Radio, User, X, Wallet } from "lucide-react";
 
 export interface AdminGameLoadRow extends GameLoadRequest {
   user?: { full_name?: string | null; email?: string } | null;
@@ -186,14 +186,6 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
     [filteredLoads]
   );
 
-  const bonusLoads = useMemo(
-    () =>
-      filteredLoads.filter(
-        (l) => l.wallet_type === "bonus" && ["load", "reload", "redeem"].includes(l.load_type)
-      ),
-    [filteredLoads]
-  );
-
   return (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -254,22 +246,13 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <LoadsPanel
-          title="Total Deposit — loads & redeems"
-          icon={Wallet}
-          loads={depositLoads}
-          emptyHint="No deposit wallet loads or redeems yet."
-          accentClass="border-emerald-500/30"
-        />
-        <LoadsPanel
-          title="Bonus Wallet — loads & redeems"
-          icon={Gift}
-          loads={bonusLoads}
-          emptyHint="No bonus wallet loads or redeems yet."
-          accentClass="border-violet-500/30"
-        />
-      </div>
+      <LoadsPanel
+        title="Total Deposit — loads & redeems"
+        icon={Wallet}
+        loads={depositLoads}
+        emptyHint="No deposit wallet loads or redeems yet."
+        accentClass="border-emerald-500/30"
+      />
     </div>
   );
 }

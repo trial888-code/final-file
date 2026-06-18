@@ -11,7 +11,6 @@ const ADMIN_ROUTES = [
   "/admin/transactions",
   "/admin/game-loads",
   "/admin/deposits",
-  "/admin/tasks",
   "/admin/reviews",
   "/admin/analytics",
 ];
