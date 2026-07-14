@@ -6,8 +6,12 @@ import { useRouter } from "next/navigation";
 /** High-traffic routes first; stagger idle prefetch to avoid blocking main thread. */
 const DASHBOARD_ROUTES = [
   "/dashboard",
+  "/dashboard/wallet",
+  "/dashboard/games",
   "/dashboard/messages",
   "/dashboard/deposit",
+  "/dashboard/rewards",
+  "/dashboard/activity",
   "/spin",
   "/dashboard/vip",
   "/dashboard/referrals",

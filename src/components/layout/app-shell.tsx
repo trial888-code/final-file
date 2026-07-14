@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { HomeHeader } from "@/components/home/home-header";
+import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,6 @@ interface AppShellProps {
   onSearchClick?: () => void;
   showFooter?: boolean;
   showTicker?: boolean;
-  /** Skip client auth check on dashboard — layout already verified session */
-  assumeLoggedIn?: boolean;
 }
 
 export function AppShell({
@@ -36,7 +34,6 @@ export function AppShell({
   onSearchClick,
   showFooter = true,
   showTicker = true,
-  assumeLoggedIn = false,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -67,23 +64,23 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-[#121212] text-foreground">
-      <HomeHeader
-        onSearchClick={onSearchClick ?? (() => {})}
+      <Navbar
         onMenuClick={() => setMobileOpen(true)}
-        assumeLoggedIn={assumeLoggedIn}
+        onSearchClick={onSearchClick}
       />
-      {showTicker && <MarqueeTicker />}
+      <div className="pt-16">
+        {showTicker && <MarqueeTicker />}
 
       {mobileOpen && (
         <>
           <div
-            className="lg:hidden fixed inset-0 z-50 bg-black/70 mobile-drawer-backdrop"
+            className="lg:hidden fixed inset-0 z-40 bg-black/70 mobile-drawer-backdrop"
             onClick={closeMobile}
             aria-hidden
           />
           <aside
             className={cn(
-              "lg:hidden fixed left-0 top-0 bottom-0 z-50 w-[min(18rem,88vw)] overflow-y-auto",
+              "lg:hidden fixed left-0 top-16 bottom-0 z-40 w-[min(18rem,88vw)] overflow-y-auto",
               "bg-[#121212] border-r border-white/10 shadow-2xl mobile-drawer-panel"
             )}
             role="dialog"
@@ -112,11 +109,12 @@ export function AppShell({
 
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         <div className="flex gap-4 lg:gap-6 items-start">
-          <div className="hidden lg:block w-64 xl:w-72 shrink-0 sticky top-[4.5rem] self-start max-h-[calc(100vh-4.5rem)] overflow-y-auto scrollbar-hide">
+          <div className="hidden lg:block w-64 xl:w-72 shrink-0 sticky top-20 self-start max-h-[calc(100vh-5rem)] overflow-y-auto scrollbar-hide">
             {sidebar}
           </div>
           <main className="flex-1 min-w-0 pb-8">{children}</main>
         </div>
+      </div>
       </div>
 
       {showFooter && <Footer fullWidth />}

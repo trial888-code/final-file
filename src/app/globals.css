@@ -843,3 +843,78 @@ html {
 body {
   overflow-x: hidden;
 }
+
+/* WinSweeps admin panel theme tokens (used by /admin routes) */
+:root {
+  --ws-gold: #f5c542;
+  --ws-gold-bright: #ffd86b;
+  --ws-gold-deep: #d99a1b;
+  --ws-bronze: #946a00;
+  --ws-green: #00d084;
+  --ws-green-bright: #2ff0a3;
+  --ws-green-deep: #0e7c5a;
+  --ws-emerald: #00d084;
+  --ws-purple: #8b5cf6;
+  --ws-cyan: #22d3ee;
+  --ws-gold-glow: rgba(245, 197, 66, 0.28);
+  --ws-green-glow: rgba(0, 208, 132, 0.26);
+  --ws-cyan-glow: rgba(34, 211, 238, 0.22);
+  --ws-purple-glow: rgba(139, 92, 246, 0.22);
+  --ws-text-faint: #756c5b;
+  --ws-danger: #f87171;
+  --ws-border: rgba(245, 220, 160, 0.10);
+  --ws-border-strong: rgba(245, 220, 160, 0.18);
+  --ws-glass-bg: rgba(21, 17, 11, 0.60);
+  --ws-glass-bg-strong: rgba(29, 24, 16, 0.78);
+  --ws-glass-edge: linear-gradient(135deg, rgba(245, 197, 66, 0.40), rgba(0, 208, 132, 0.14) 60%, rgba(255, 255, 255, 0) 85%);
+}
+
+@theme {
+  --color-ws-gold: var(--ws-gold);
+  --color-ws-gold-bright: var(--ws-gold-bright);
+  --color-ws-gold-deep: var(--ws-gold-deep);
+  --color-ws-bronze: var(--ws-bronze);
+  --color-ws-green: var(--ws-green);
+  --color-ws-green-bright: var(--ws-green-bright);
+  --color-ws-green-deep: var(--ws-green-deep);
+  --color-ws-emerald: var(--ws-emerald);
+  --color-ws-purple: var(--ws-purple);
+  --color-ws-cyan: var(--ws-cyan);
+  --color-ws-text-faint: var(--ws-text-faint);
+  --color-ws-danger: var(--ws-danger);
+}
+
+.glass-strong {
+  background: var(--ws-glass-bg-strong);
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  border: 1px solid var(--ws-border-strong);
+}
+
+.glass-edge {
+  position: relative;
+}
+
+.glass-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--ws-glass-edge);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.hud-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

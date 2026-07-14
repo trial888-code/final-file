@@ -80,9 +80,11 @@ const MAIN_TABS: { id: HomeGameTab; label: string }[] = [
 interface HomeLandingShellProps {
   /** Server-rendered hero for fast LCP on mobile */
   hero?: ReactNode;
+  /** Optional CMS-driven sections (FAQs, reviews, guides) from the database */
+  cmsSections?: ReactNode;
 }
 
-export function HomeLandingShell({ hero }: HomeLandingShellProps) {
+export function HomeLandingShell({ hero, cmsSections }: HomeLandingShellProps) {
   const router = useRouter();
   usePrefetchDashboardRoutes();
   const [sidebarTab, setSidebarTab] = useState<GameTab>("all");
@@ -222,10 +224,12 @@ export function HomeLandingShell({ hero }: HomeLandingShellProps) {
           <ActivityFeed />
         </LazyWhenVisible>
         <LazyWhenVisible placeholder={<SectionPlaceholder />}>
-          <PublicReviewsSection />
-        </LazyWhenVisible>
-        <LazyWhenVisible placeholder={<SectionPlaceholder />}>
-          <FaqSection />
+          {cmsSections ?? (
+            <>
+              <PublicReviewsSection />
+              <FaqSection />
+            </>
+          )}
         </LazyWhenVisible>
       </div>
 

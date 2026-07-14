@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
+import { isCaptchaSolverConfigured } from "../../shared/panel-login-captcha.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL = process.env.GAMEVAULT_ADMIN_URL?.trim() || "https://agent.gamevault999.com/login";
@@ -34,11 +35,11 @@ export async function loginToPanel(page: Page): Promise<void> {
 
   const interactive =
     process.env.GAMEVAULT_HEADLESS === "false" || Boolean(process.env.GAMEVAULT_CDP_URL);
-  if (interactive) {
+  if (interactive || isCaptchaSolverConfigured()) {
     await waitForManualLogin(page);
     await page.goto(USER_MGMT_URL, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(1200);
-    log("login", "success (manual captcha)");
+    log("login", "success");
     return;
   }
 

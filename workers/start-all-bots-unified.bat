@@ -8,7 +8,8 @@ echo.
 echo ============================================================
 echo   ALL BOTS — SINGLE CHROME (each bot uses its own tab)
 echo ============================================================
-echo   Requires start-unified-chrome.bat first + all tabs logged in.
+echo   Requires start-unified-chrome.bat first.
+echo   Bots auto-login each tab on startup (CAPTCHA OCR) + every 5 min.
 echo ============================================================
 echo.
 

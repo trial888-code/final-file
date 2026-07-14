@@ -5,7 +5,8 @@ import {
   countActiveGameLoads,
   healStaleGameLoadsForSlug,
 } from "../../shared/heal-stale-game-loads.js";
-import { runJob } from "./bot.js";
+import { startPanelSessionKeeper } from "../../shared/panel-session-keeper.js";
+import { ensurePanelLoggedIn, runJob } from "./bot.js";
 import type { GameLoadJob } from "./types.js";
 
 const POLL_MS = Number(process.env.CASHFRENZY_POLL_MS ?? 10_000);
@@ -117,6 +118,8 @@ async function main() {
   const supabase = createAdminSupabase();
 
   console.log("[cash-frenzy-bot] Started — polling for Cash Frenzy wallet load jobs");
+
+  await startPanelSessionKeeper("cash-frenzy-bot", ensurePanelLoggedIn);
 
   do {
     try {

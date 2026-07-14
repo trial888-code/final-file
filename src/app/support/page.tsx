@@ -4,19 +4,32 @@ import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supportMetadata } from "@/lib/seo/metadata";
+import { getPublishedFaqs } from "@/lib/data/faqs-public";
 import Link from "next/link";
 import { MessageCircle, Mail, HelpCircle, Clock } from "lucide-react";
 
 export const metadata = supportMetadata;
 
-const faqs = [
+const FALLBACK_FAQS = [
   { q: "How do I request a game account?", a: "Create a free account, navigate to your dashboard, and submit a game request. Our team will process it within 24 hours." },
   { q: "How does the VIP program work?", a: "Earn VIP points through game requests and referrals. Points unlock Bronze, Silver, Gold, and Platinum tiers with increasing benefits." },
   { q: "Is live chat available 24/7?", a: "Yes! Use the floating chat widget on any page or visit your dashboard messages for real-time support." },
-  { q: "How do referrals work?", a: "Share your unique referral code. When friends sign up, you earn 10 VIP points per referral." },
+  { q: "How do referrals work?", a: "Share your unique referral code. When friends sign up, you earn VIP points per referral." },
 ];
 
-export default function SupportPage() {
+export default async function SupportPage() {
+  const dbFaqs = await getPublishedFaqs();
+  const faqs = dbFaqs.length
+    ? dbFaqs.map((f) => ({ q: f.question, a: f.answer, category: f.category }))
+    : FALLBACK_FAQS.map((f) => ({ ...f, category: "general" }));
+
+  const grouped = faqs.reduce<Record<string, typeof faqs>>((acc, faq) => {
+    const key = faq.category || "general";
+    acc[key] = acc[key] ?? [];
+    acc[key].push(faq);
+    return acc;
+  }, {});
+
   return (
     <>
       <Navbar />
@@ -38,39 +51,49 @@ export default function SupportPage() {
               { icon: MessageCircle, title: "Live Chat", desc: "Chat with our support team in real-time", action: "Open Chat", href: "/login" },
               { icon: Mail, title: "Email Support", desc: "support@spinoracasinos.com", action: "Send Email", href: "mailto:support@spinoracasinos.com" },
               { icon: Clock, title: "Response Time", desc: "Average response under 5 minutes", action: "Learn More", href: "/about" },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <Card key={item.title} className="text-center hover:glow-purple transition-all">
-                  <CardContent className="p-6">
-                    <Icon className="h-10 w-10 text-primary mx-auto mb-4" />
-                    <h3 className="font-semibold mb-2">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{item.desc}</p>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={item.href}>{item.action}</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            ].map(({ icon: Icon, title, desc, action, href }) => (
+              <Card key={title} className="hover:glow-purple transition-all">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center mb-2">
+                    <Icon className="h-6 w-6 text-white" />
+                  </div>
+                  <CardTitle className="text-lg">{title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">{desc}</p>
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={href}>{action}</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          <div>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <HelpCircle className="h-6 w-6 text-primary" /> Frequently Asked Questions
-            </h2>
-            <div className="space-y-4">
-              {faqs.map((faq) => (
-                <Card key={faq.q}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{faq.q}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{faq.a}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          <div className="mb-8 flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-orange-400" />
+            <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
+          </div>
+
+          <div className="space-y-8">
+            {Object.entries(grouped).map(([category, items]) => (
+              <div key={category}>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                  {category.replace(/_/g, " ")}
+                </h3>
+                <div className="grid gap-4">
+                  {items.map((faq) => (
+                    <Card key={faq.q}>
+                      <CardHeader>
+                        <CardTitle className="text-base">{faq.q}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-line">{faq.a}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </main>

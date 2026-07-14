@@ -33,6 +33,8 @@ echo   Tab 7 Mafia         https://agentserver.mafia77777.com/admin
 echo   Tab 8 Cash Frenzy   https://agentserver.cashfrenzy777.com/admin
 echo.
 echo   Log in on EACH tab. Juwa: turn VPN ON in this Chrome first.
+echo   OR skip manual login — run start-all-bots-unified.bat and bots
+echo   will auto-login each tab (read CAPTCHA) on startup.
 echo   Then run:  start-all-bots-unified.bat
 echo ============================================================
 echo.
@@ -81,7 +83,8 @@ echo.
 if !TAB_EXIT! NEQ 0 (
   echo   Tab script failed. Close other Chrome on port 9222 and retry.
 ) else (
-  echo   Done — one Chrome window, 8 tabs. Log in on each, then start-all-bots-unified.bat
+  echo   Done — one Chrome window, 8 tabs. Run start-all-bots-unified.bat
+  echo   (bots auto-login + read CAPTCHA on each tab at startup).
 )
 echo.
 pause

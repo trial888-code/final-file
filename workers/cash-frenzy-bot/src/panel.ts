@@ -1,6 +1,7 @@
 import type { Frame, Locator, Page } from "playwright";
 import { normalizeUsername } from "./credentials.js";
 import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
+import { isCaptchaSolverConfigured } from "../../shared/panel-login-captcha.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL =
@@ -30,7 +31,7 @@ export async function loginToPanel(page: Page): Promise<void> {
 
     const interactive =
       process.env.CASHFRENZY_HEADLESS === "false" || Boolean(process.env.CASHFRENZY_CDP_URL);
-    if (interactive) {
+    if (interactive || isCaptchaSolverConfigured()) {
       await waitForManualLogin(page);
     } else {
       await screenshot(page, "login-captcha");

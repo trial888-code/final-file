@@ -1,6 +1,7 @@
 import type { Locator, Page } from "playwright";
 import { mkdirSync } from "fs";
 import { join } from "path";
+import { waitForPanelLogin } from "../../shared/panel-login-captcha.js";
 
 const DEBUG_DIR = join(process.cwd(), "debug");
 
@@ -111,11 +112,13 @@ export async function isLoginPage(page: Page): Promise<boolean> {
 }
 
 export async function waitForManualLogin(page: Page, timeoutMs = 180_000) {
-  log("login", "CAPTCHA on page — log in manually in Chrome (enter code + click Sign in)");
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!(await isLoginPage(page))) return;
-    await page.waitForTimeout(1000);
-  }
-  throw new Error("Login timeout — enter CAPTCHA and click Sign in in the Chrome window");
+  const allowManual =
+    process.env.JUWA_HEADLESS === "false" || Boolean(process.env.JUWA_CDP_URL);
+  await waitForPanelLogin(page, {
+    log,
+    isLoginPage,
+    allowManual,
+    manualTimeoutMs: timeoutMs,
+    loginButtonPatterns: [/sign in|login|log in|登[录陆]/i],
+  });
 }

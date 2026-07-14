@@ -20,7 +20,7 @@ export function DashboardShell({ children, sidebar }: DashboardShellProps) {
   }, [searchParams]);
 
   return (
-    <AppShell showTicker={false} showFooter={false} assumeLoggedIn sidebar={sidebar}>
+    <AppShell showTicker={false} showFooter={false} sidebar={sidebar}>
       {children}
     </AppShell>
   );

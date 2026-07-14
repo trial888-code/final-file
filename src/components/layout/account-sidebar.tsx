@@ -10,12 +10,14 @@ import {
   Users,
   StarHalf,
   Target,
+  Trophy,
   Sparkles,
   Headphones,
   ShieldCheck,
   Gamepad2,
   Banknote,
   History,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
@@ -23,13 +25,18 @@ import { UnreadBadge } from "@/components/ui/unread-badge";
 
 const ACCOUNT_LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/#games", label: "Games", icon: Gamepad2, gamesLink: true },
+  { href: "/dashboard/games", label: "My Games", icon: Gamepad2 },
+  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
   { href: "/dashboard/deposits", label: "My Deposits", icon: History },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },
   { href: "/dashboard/referrals", label: "Referrals", icon: Users },
   { href: "/dashboard/reviews", label: "Reviews", icon: StarHalf },
+  { href: "/dashboard/rewards", label: "Rewards", icon: Target },
+  { href: "/dashboard/achievements", label: "Achievements", icon: Trophy },
+  { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
+  { href: "/dashboard/activity", label: "Activity", icon: History },
   { href: "/spin", label: "Daily Spin", icon: Sparkles },
 ];
 
@@ -75,12 +82,10 @@ export function AccountSidebar({ walletSlot, className }: AccountSidebarProps) {
           My Account
         </p>
         <nav className="space-y-1">
-          {ACCOUNT_LINKS.map(({ href, label, icon: Icon, exact, gamesLink }) => {
-            const active = gamesLink
-              ? pathname === "/" || pathname.startsWith("/games")
-              : exact
-                ? pathname === href
-                : pathname === href || pathname.startsWith(`${href}/`);
+          {ACCOUNT_LINKS.map(({ href, label, icon: Icon, exact }) => {
+            const active = exact
+              ? pathname === href
+              : pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}

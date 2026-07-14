@@ -96,6 +96,23 @@ async function hasCaptcha(page: Page): Promise<boolean> {
   return page.getByText(/verification code|captcha|vc/i).isVisible().catch(() => false);
 }
 
+async function fillLoginCredentials(page: Page, username: string, password: string) {
+  const customUser = envOptional("JUWA_SEL_LOGIN_USER");
+  const customPass = envOptional("JUWA_SEL_LOGIN_PASS");
+
+  if (customUser) {
+    await page.fill(customUser, username);
+  } else {
+    await fillFirstTextInput(page, username, 0);
+  }
+
+  if (customPass) {
+    await page.fill(customPass, password);
+  } else {
+    await fillPasswordInput(page, password, 0);
+  }
+}
+
 async function login(page: Page) {
   const url = env("JUWA_ADMIN_URL");
   const username = env("JUWA_AGENT_USERNAME");
@@ -117,26 +134,13 @@ async function login(page: Page) {
     return;
   }
 
+  await fillLoginCredentials(page, username, password);
+
   if (await hasCaptcha(page)) {
     await waitForManualLogin(page);
     await screenshot(page, "02-after-login");
-    log("login", "success (manual)");
+    log("login", "success");
     return;
-  }
-
-  const customUser = envOptional("JUWA_SEL_LOGIN_USER");
-  const customPass = envOptional("JUWA_SEL_LOGIN_PASS");
-
-  if (customUser) {
-    await page.fill(customUser, username);
-  } else {
-    await fillFirstTextInput(page, username, 0);
-  }
-
-  if (customPass) {
-    await page.fill(customPass, password);
-  } else {
-    await fillPasswordInput(page, password, 0);
   }
 
   const customSubmit = envOptional("JUWA_SEL_LOGIN_SUBMIT");
@@ -173,6 +177,17 @@ async function redeemUser(
   const redeemedAmount = await redeemAccount(page, username, amount);
   await screenshot(page, "07-after-redeem");
   return { username, redeemedAmount };
+}
+
+export async function ensurePanelLoggedIn(): Promise<void> {
+  const session = await openBrowserSession();
+  try {
+    await login(session.page);
+  } finally {
+    if (!process.env.JUWA_CDP_URL) {
+      await session.close();
+    }
+  }
 }
 
 export async function runJuwaJob(job: GameLoadJob, supabase: SupabaseClient): Promise<JuwaBotResult> {

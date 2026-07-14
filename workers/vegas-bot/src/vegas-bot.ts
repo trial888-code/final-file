@@ -11,6 +11,11 @@ import {
   readBalance,
 } from "./vegas-panel.js";
 import { log, screenshot } from "./panel-utils.js";
+import { ensurePanelSession } from "../../shared/ensure-panel-session.js";
+
+export async function ensurePanelLoggedIn(): Promise<void> {
+  await ensurePanelSession(openBrowserSession, "VEGAS_CDP_URL", loginToPanel);
+}
 
 export async function runVegasJob(job: GameLoadJob, supabase: SupabaseClient): Promise<VegasBotResult> {
   const session = await openBrowserSession();

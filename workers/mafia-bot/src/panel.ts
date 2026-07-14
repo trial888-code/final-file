@@ -1,6 +1,7 @@
 import type { Frame, Locator, Page } from "playwright";
 import { normalizeUsername, passwordForAccount } from "./credentials.js";
 import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
+import { isCaptchaSolverConfigured } from "../../shared/panel-login-captcha.js";
 import { isLoginPage, log, parseMoney, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 /**
@@ -63,10 +64,10 @@ export async function loginToPanel(page: Page): Promise<void> {
 
   const interactive =
     process.env.MAFIA_HEADLESS === "false" || Boolean(process.env.MAFIA_CDP_URL);
-  if (interactive) {
+  if (interactive || isCaptchaSolverConfigured()) {
     await waitForManualLogin(page);
     await getListScope(page);
-    log("login", "success (manual captcha)");
+    log("login", "success");
     return;
   }
 

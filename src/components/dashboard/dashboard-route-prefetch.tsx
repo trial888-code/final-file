@@ -11,6 +11,9 @@ const DASHBOARD_ROUTES = [
   "/dashboard/vip",
   "/dashboard/referrals",
   "/dashboard/reviews",
+  "/dashboard/rewards",
+  "/dashboard/achievements",
+  "/dashboard/leaderboard",
   "/spin",
 ];
 

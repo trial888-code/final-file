@@ -11,6 +11,11 @@ import {
   readBalance,
 } from "./panel.js";
 import { log, screenshot } from "./panel-utils.js";
+import { ensurePanelSession } from "../../shared/ensure-panel-session.js";
+
+export async function ensurePanelLoggedIn(): Promise<void> {
+  await ensurePanelSession(openBrowserSession, "CASHMACHINE_CDP_URL", loginToPanel);
+}
 
 export async function runJob(job: GameLoadJob, supabase: SupabaseClient): Promise<BotResult> {
   const session = await openBrowserSession();

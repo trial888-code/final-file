@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import {
   INVALID_PHONE_MESSAGE,
   parseInternationalPhone,
@@ -508,4 +509,10 @@ export async function syncProfileFromAuthMetadata(): Promise<void> {
   if (error) {
     console.error("syncProfileFromAuthMetadata:", error.message);
   }
+}
+
+export async function logoutAction(): Promise<never> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/login");
 }

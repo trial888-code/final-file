@@ -1,130 +1,188 @@
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Users, MessageSquare, Star, Banknote, History, Wallet, ShieldAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { AdminBroadcastNotice } from "@/components/admin/admin-broadcast-notice";
+import { formatDistanceToNow } from "date-fns";
+import {
+  ArrowRight,
+  BadgePercent,
+  CheckCircle2,
+  Coins,
+  Inbox,
+  LifeBuoy,
+  TrendingUp,
+  UserPlus,
+  Users,
+} from "lucide-react";
 
-export default async function AdminPage() {
-  const supabase = await createClient();
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { GlassCard } from "@/components/shared/glass-card";
+import { StatCard } from "@/components/shared/stat-card";
+import { adminDb } from "@/lib/actions/admin/core";
+import {
+  ADMIN_PROFILE_SELECT,
+  profileDisplayName,
+  profileHandle,
+} from "@/lib/admin/spinora-profile";
+import { requireStaff } from "@/lib/data/admin";
+import { getDashboardStats } from "@/lib/data/admin-stats";
+
+export default async function AdminOverviewPage() {
+  const ctx = await requireStaff();
+  const db = adminDb();
+
+  const since7d = new Date(Date.now() - 7 * 86_400_000).toISOString();
 
   const [
-    { count: userCount },
-    { count: pendingLoads },
-    { count: transactionCount },
-    { count: conversationCount },
-    { count: reviewCount },
-    { count: pendingDeposits },
-    { count: flaggedUsers },
+    stats,
+    new7d,
+    activePromos,
+    pendingReferrals,
+    recentSignups,
+    recentTickets,
+    fulfilledRequests,
   ] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase
-      .from("game_load_requests")
-      .select("*", { count: "exact", head: true })
-      .in("load_type", ["load", "reload", "redeem"])
-      .in("status", ["pending", "processing"]),
-    supabase.from("wallet_transactions").select("*", { count: "exact", head: true }),
-    supabase.from("conversations").select("*", { count: "exact", head: true }).eq("is_active", true),
-    supabase.from("reviews").select("*", { count: "exact", head: true }),
-    supabase
-      .from("deposit_requests")
-      .select("*", { count: "exact", head: true })
-      .in("status", ["pending", "processing"]),
-    supabase
-      .from("fraud_scores")
-      .select("*", { count: "exact", head: true })
-      .or("rewards_blocked.eq.true,blocked.eq.true,manual_review.eq.true,risk_score.gte.50"),
+    getDashboardStats(86_400_000),
+    db.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", since7d),
+    db.from("promotions").select("id", { count: "exact", head: true }).eq("status", "active"),
+    db.from("referrals").select("id", { count: "exact", head: true }),
+    db
+      .from("profiles")
+      .select(ADMIN_PROFILE_SELECT)
+      .order("created_at", { ascending: false })
+      .limit(6),
+    db.from("support_tickets").select("id, ticket_no, subject, status, created_at").order("created_at", { ascending: false }).limit(6),
+    db.from("deposit_requests").select("id", { count: "exact", head: true }).eq("status", "completed"),
   ]);
 
-  const stats = [
-    { icon: Users, label: "Total Users", value: userCount || 0, href: "/admin/users" },
-    {
-      icon: ShieldAlert,
-      label: "Flagged Users",
-      value: flaggedUsers || 0,
-      href: "/admin/fraud",
-    },
-    {
-      icon: Banknote,
-      label: "Wallet Loads",
-      value: pendingLoads || 0,
-      href: "/admin/game-loads",
-    },
-    {
-      icon: History,
-      label: "Transactions",
-      value: transactionCount || 0,
-      href: "/admin/transactions",
-    },
-    {
-      icon: Wallet,
-      label: "Pending Deposits",
-      value: pendingDeposits || 0,
-      href: "/admin/deposits?status=pending",
-    },
-    { icon: MessageSquare, label: "Active Chats", value: conversationCount || 0, href: "/admin/chat" },
-    { icon: Star, label: "Reviews", value: reviewCount || 0, href: "/admin/reviews" },
-  ];
-
   return (
-    <div>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Admin Panel</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">Platform overview and management</p>
+    <div className="mx-auto max-w-6xl">
+      <AdminPageHeader
+        title="Overview"
+        description={`Welcome back, ${ctx.email ?? "admin"}. Here's the pulse of Spinora.`}
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total members"
+          value={stats.totalUsers.toLocaleString()}
+          delta={stats.newUsersInWindow}
+          deltaLabel="today"
+          icon={<Users />}
+          accent="cyan"
+        />
+        <StatCard
+          label="New this week"
+          value={(new7d.count ?? 0).toLocaleString()}
+          icon={<TrendingUp />}
+          accent="emerald"
+        />
+        <StatCard
+          label="Coins issued (24h)"
+          value={stats.coinsIssuedInWindow.toLocaleString()}
+          icon={<Coins />}
+          accent="gold"
+        />
+        <StatCard
+          label="Active promotions"
+          value={(activePromos.count ?? 0).toLocaleString()}
+          icon={<BadgePercent />}
+          accent="purple"
+        />
       </div>
 
-      <div className="mb-6 flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-        <Button asChild className="w-full sm:w-auto">
-          <Link href="/admin/chat">Open Customer Chat</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/game-loads">Wallet Loads</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/users">Manage Users</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/fraud">Fraud / Flags</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/transactions">View Transactions</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/deposits">Deposits</Link>
-        </Button>
-        <Button variant="outline" asChild className="w-full sm:w-auto">
-          <Link href="/admin/reviews">Manage Reviews</Link>
-        </Button>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Open tickets"
+          value={stats.openTickets.toLocaleString()}
+          icon={<LifeBuoy />}
+          accent="cyan"
+        />
+        <StatCard
+          label="Total referrals"
+          value={(pendingReferrals.count ?? 0).toLocaleString()}
+          icon={<UserPlus />}
+          accent="purple"
+        />
+        <StatCard
+          label="Pending requests"
+          value={stats.pendingRequests.toLocaleString()}
+          icon={<Inbox />}
+          accent="gold"
+        />
+        <StatCard
+          label="Completed deposits"
+          value={(fulfilledRequests.count ?? 0).toLocaleString()}
+          icon={<CheckCircle2 />}
+          accent="emerald"
+        />
       </div>
 
-      <div className="mb-6 sm:mb-8">
-        <AdminBroadcastNotice />
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold">Newest members</h2>
             <Link
-              key={stat.label}
-              href={stat.href}
-              className={cn(
-                "group rounded-xl border border-white/10 bg-[#161616] p-3 sm:p-4",
-                "transition-all hover:border-orange-500/40 hover:bg-white/5 active:scale-[0.98]"
-              )}
+              href="/admin/users"
+              className="inline-flex items-center gap-1 text-xs font-medium text-ws-cyan underline-offset-4 hover:underline"
             >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xl sm:text-2xl font-bold">{stat.value}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{stat.label}</p>
-                </div>
-              </div>
+              All users
+              <ArrowRight className="size-3.5" aria-hidden />
             </Link>
-          );
-        })}
+          </div>
+          <ul className="mt-4 divide-y divide-foreground/8">
+            {(recentSignups.data ?? []).map((u) => (
+              <li key={u.id} className="flex items-center justify-between py-2.5">
+                <span className="text-sm font-medium">
+                  {profileDisplayName(u)}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {profileHandle(u)}
+                  </span>
+                </span>
+                <time
+                  dateTime={u.created_at}
+                  className="text-xs text-muted-foreground"
+                >
+                  {formatDistanceToNow(new Date(u.created_at!), { addSuffix: true })}
+                </time>
+              </li>
+            ))}
+          </ul>
+        </GlassCard>
+
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold">Latest tickets</h2>
+            <Link
+              href="/admin/support"
+              className="inline-flex items-center gap-1 text-xs font-medium text-ws-cyan underline-offset-4 hover:underline"
+            >
+              Support inbox
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          </div>
+          <ul className="mt-4 divide-y divide-foreground/8">
+            {(recentTickets.data ?? []).length === 0 ? (
+              <li className="py-2.5 text-sm text-muted-foreground">
+                No tickets yet.
+              </li>
+            ) : (
+              (recentTickets.data ?? []).map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <Link
+                    href={`/admin/support/${t.id}`}
+                    className="min-w-0 flex-1 truncate text-sm font-medium hover:text-ws-green-deep dark:text-ws-green"
+                  >
+                    <span className="tnum text-xs text-muted-foreground">
+                      #{t.ticket_no}
+                    </span>{" "}
+                    {t.subject}
+                  </Link>
+                  <span className="shrink-0 text-xs text-muted-foreground uppercase">
+                    {t.status}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+        </GlassCard>
       </div>
     </div>
   );

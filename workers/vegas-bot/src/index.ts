@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { enrichGameLoadJob } from "../../shared/enrich-game-load-job.js";
-import { runVegasJob } from "./vegas-bot.js";
+import { startPanelSessionKeeper } from "../../shared/panel-session-keeper.js";
+import { ensurePanelLoggedIn, runVegasJob } from "./vegas-bot.js";
 import type { GameLoadJob } from "./types.js";
 
 const POLL_MS = Number(process.env.VEGAS_POLL_MS ?? 10_000);
@@ -103,6 +104,8 @@ async function main() {
   const supabase = createAdminSupabase();
 
   console.log("[vegas-bot] Started — polling for Vegas Sweeps wallet load jobs");
+
+  await startPanelSessionKeeper("vegas-bot", ensurePanelLoggedIn);
 
   do {
     try {

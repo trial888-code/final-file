@@ -72,7 +72,8 @@ export async function updateSession(request: NextRequest) {
 
   if (user && emailConfirmed && isAuth && path !== "/auth/callback" && !path.startsWith("/reset-password/update")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = request.nextUrl.searchParams.get("redirect") || "/dashboard";
+    url.searchParams.delete("redirect");
     return NextResponse.redirect(url);
   }
 

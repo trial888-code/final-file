@@ -49,10 +49,16 @@ export const REQUEST_STATUSES = [
 
 export const PUBLIC_ROUTES = [
   { path: "/", priority: 1.0 },
+  { path: "/games", priority: 0.95 },
+  { path: "/blog", priority: 0.9 },
   { path: "/promotions", priority: 0.9 },
+  { path: "/leaderboard", priority: 0.85 },
   { path: "/vip", priority: 0.9 },
   { path: "/about", priority: 0.8 },
   { path: "/support", priority: 0.8 },
+  { path: "/contact", priority: 0.75 },
+  { path: "/terms", priority: 0.5 },
+  { path: "/privacy", priority: 0.5 },
   { path: "/spin", priority: 0.85 },
   { path: "/login", priority: 0.5 },
   { path: "/register", priority: 0.5 },
@@ -62,7 +68,7 @@ export const PUBLIC_ROUTES = [
 export const SOCIAL_LINKS = {
   telegram:
     process.env.NEXT_PUBLIC_TELEGRAM_URL ||
-    "https://telegram.me/jameswtm",
+    "https://t.me/+Y80HSM0UiZw5ODdh",
   facebook:
     process.env.NEXT_PUBLIC_FACEBOOK_URL ||
     "https://www.facebook.com/share/19ea1cSC5W/",
