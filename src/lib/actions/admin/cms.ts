@@ -336,6 +336,39 @@ export async function upsertBlogPostAction(
   return { ok: true, message: "Post saved." };
 }
 
+export async function fetchBlogPostForEditAction(
+  id: string
+): Promise<
+  | {
+      ok: true;
+      post: {
+        id: string;
+        slug: string;
+        title: string;
+        excerpt: string | null;
+        content: string;
+        status: string;
+        seo_title: string | null;
+        seo_description: string | null;
+        published_at: string | null;
+      };
+    }
+  | { ok: false; error: string }
+> {
+  const auth = await authorize(PERMISSION);
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const db = adminDb();
+  const { data, error } = await db
+    .from("blog_posts")
+    .select("id, slug, title, excerpt, content, status, seo_title, seo_description, published_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: "Post not found." };
+  return { ok: true, post: data };
+}
+
 const IMAGE_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/avif"];
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB — matches the cms-media bucket's own limit
 

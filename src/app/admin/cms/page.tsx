@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format } from "date-fns";
 
+import {
+  BlogPostCreateDialog,
+  BlogPostDeleteButton,
+  BlogPostEditDialog,
+} from "@/components/admin/blog-post-edit-dialog";
+import { CmsTabNav } from "@/components/admin/cms-tab-nav";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import {
@@ -15,13 +20,10 @@ import {
   deleteCmsEntityAction,
   upsertAnnouncementAction,
   upsertBannerAction,
-  upsertBlogPostAction,
   upsertFaqAction,
   upsertTestimonialAction,
-  uploadBlogImageAction,
 } from "@/lib/actions/admin/cms";
 import { requirePermission } from "@/lib/data/admin";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "CMS" };
 
@@ -38,48 +40,28 @@ type TabKey = (typeof TABS)[number]["key"];
 export default async function AdminCmsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string }>;
 }) {
   await requirePermission("cms.manage");
   const params = await searchParams;
   const tab = (TABS.find((t) => t.key === params.tab)?.key ?? "faq") as TabKey;
+  const blogPage = Math.max(1, Number(params.page) || 1);
   const db = adminDb();
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-7xl">
       <AdminPageHeader
         title="Content Management"
         description="Manage public-facing content: FAQ, banners, announcements, testimonials and blog."
       />
 
-      <div
-        role="tablist"
-        aria-label="CMS section"
-        className="glass mb-6 inline-flex flex-wrap gap-1 rounded-full p-1"
-      >
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={`/admin/cms?tab=${t.key}`}
-            role="tab"
-            aria-selected={t.key === tab}
-            className={cn(
-              "min-h-9 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-              t.key === tab
-                ? "bg-emerald-500 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <CmsTabNav active={tab} />
 
       {tab === "faq" && <FaqSection db={db} />}
       {tab === "banners" && <BannersSection db={db} />}
       {tab === "announcements" && <AnnouncementsSection db={db} />}
       {tab === "testimonials" && <TestimonialsSection db={db} />}
-      {tab === "blog" && <BlogSection db={db} />}
+      {tab === "blog" && <BlogSection db={db} page={blogPage} />}
     </div>
   );
 }
@@ -125,7 +107,7 @@ async function FaqSection({ db }: { db: DB }) {
           <p className="p-6 text-center text-sm text-muted-foreground">No FAQs yet.</p>
         ) : (
           faqs.map((f) => (
-            <div key={f.id} className="flex items-start justify-between gap-4 p-4">
+            <div key={f.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium">{f.question}</p>
@@ -138,7 +120,7 @@ async function FaqSection({ db }: { db: DB }) {
                 </p>
                 <p className="mt-1 text-xs text-ws-text-faint">{f.category}</p>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
                   title="Edit FAQ"
                   fields={[
@@ -249,7 +231,7 @@ async function BannersSection({ db }: { db: DB }) {
                 <p className="mt-0.5 text-xs text-muted-foreground">{b.subtitle}</p>
                 <p className="mt-1 text-xs text-ws-text-faint">{b.placement}</p>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
                   title="Edit banner"
                   fields={[
@@ -352,7 +334,7 @@ async function AnnouncementsSection({ db }: { db: DB }) {
                   {a.body}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
                   title="Edit announcement"
                   fields={[
@@ -447,7 +429,7 @@ async function TestimonialsSection({ db }: { db: DB }) {
                   “{t.quote}”
                 </p>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 flex-wrap gap-1">
                 <EntityEditDialog
                   title="Edit testimonial"
                   fields={[
@@ -490,48 +472,6 @@ async function TestimonialsSection({ db }: { db: DB }) {
 
 /* ── Blog ─────────────────────────────────────────────────────────────────── */
 
-const BLOG_STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "draft", label: "Draft" },
-  { value: "scheduled", label: "Scheduled" },
-  { value: "published", label: "Published" },
-  { value: "archived", label: "Archived" },
-];
-
-function blogStatusFields(p?: {
-  seo_title: string | null;
-  seo_description: string | null;
-  status: string;
-  published_at: string | null;
-}) {
-  return [
-    {
-      name: "seo_title" as const,
-      label: "SEO title",
-      type: "text" as const,
-      defaultValue: p?.seo_title ?? "",
-    },
-    {
-      name: "seo_description" as const,
-      label: "SEO description",
-      type: "textarea" as const,
-      defaultValue: p?.seo_description ?? "",
-    },
-    {
-      name: "status" as const,
-      label: "Status",
-      type: "select" as const,
-      defaultValue: p?.status ?? "draft",
-      options: BLOG_STATUS_OPTIONS,
-    },
-    {
-      name: "published_at" as const,
-      label: "Publish date/time (Scheduled only)",
-      type: "datetime-local" as const,
-      defaultValue: p?.published_at ? format(new Date(p.published_at), "yyyy-MM-dd'T'HH:mm") : "",
-    },
-  ];
-}
-
 function blogStatusBadge(status: string) {
   switch (status) {
     case "published":
@@ -545,110 +485,74 @@ function blogStatusBadge(status: string) {
   }
 }
 
-async function BlogSection({ db }: { db: DB }) {
-  const { data } = await db
+async function BlogSection({ db, page }: { db: DB; page: number }) {
+  const PAGE_SIZE = 20;
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const { data, count } = await db
     .from("blog_posts")
-    .select("id, slug, title, excerpt, content, status, seo_title, seo_description, published_at")
-    .order("created_at", { ascending: false });
+    .select("id, slug, title, excerpt, status, published_at", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
   const posts = data ?? [];
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <EntityEditDialog
-          title="New post"
-          triggerLabel="New post"
-          dialogClassName="sm:max-w-3xl max-h-[85vh] overflow-y-auto"
-          fields={[
-            { name: "title", label: "Title", type: "text", defaultValue: "" },
-            { name: "slug", label: "Slug", type: "text", defaultValue: "" },
-            { name: "excerpt", label: "Excerpt", type: "textarea", defaultValue: "" },
-            {
-              name: "content",
-              label: "Content",
-              type: "richtext",
-              defaultValue: "",
-              onUploadImage: uploadBlogImageAction,
-              withSeoPanel: true,
-            },
-            ...blogStatusFields(),
-          ]}
-          action={async (v: Record<string, FieldValue>) => {
-            "use server";
-            return upsertBlogPostAction({
-              title: String(v.title),
-              slug: String(v.slug),
-              excerpt: String(v.excerpt),
-              content: String(v.content),
-              seo_title: String(v.seo_title ?? ""),
-              seo_description: String(v.seo_description ?? ""),
-              status: v.status as "draft" | "scheduled" | "published" | "archived",
-              published_at: String(v.published_at ?? ""),
-            });
-          }}
-        />
+        <BlogPostCreateDialog />
       </div>
       <GlassCard className="divide-y divide-foreground/8">
         {posts.length === 0 ? (
           <p className="p-6 text-center text-sm text-muted-foreground">No posts yet.</p>
         ) : (
           posts.map((p) => (
-            <div key={p.id} className="flex items-start justify-between gap-4 p-4">
+            <div
+              key={p.id}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+            >
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{p.title}</p>
                   {blogStatusBadge(p.status)}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                  {p.excerpt}
-                </p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.excerpt}</p>
                 <p className="mt-1 text-xs text-ws-text-faint">/{p.slug}</p>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <EntityEditDialog
-                  title="Edit post"
-                  dialogClassName="sm:max-w-3xl max-h-[85vh] overflow-y-auto"
-                  enableAutosave
-                  fields={[
-                    { name: "title", label: "Title", type: "text", defaultValue: p.title },
-                    { name: "slug", label: "Slug", type: "text", defaultValue: p.slug },
-                    { name: "excerpt", label: "Excerpt", type: "textarea", defaultValue: p.excerpt },
-                    {
-                      name: "content",
-                      label: "Content",
-                      type: "richtext",
-                      defaultValue: p.content,
-                      onUploadImage: uploadBlogImageAction,
-                      withSeoPanel: true,
-                    },
-                    ...blogStatusFields(p),
-                  ]}
-                  action={async (v: Record<string, FieldValue>) => {
-                    "use server";
-                    return upsertBlogPostAction({
-                      id: p.id,
-                      title: String(v.title),
-                      slug: String(v.slug),
-                      excerpt: String(v.excerpt),
-                      content: String(v.content),
-                      seo_title: String(v.seo_title ?? ""),
-                      seo_description: String(v.seo_description ?? ""),
-                      status: v.status as "draft" | "scheduled" | "published" | "archived",
-                      published_at: String(v.published_at ?? ""),
-                    });
-                  }}
-                />
-                <ConfirmActionButton
-                  action={deleteCmsEntityAction.bind(null, "blog_posts", p.id)}
-                  title="Delete post?"
-                  description="This blog post will be permanently removed."
-                  confirmLabel="Delete"
-                />
+              <div className="flex shrink-0 flex-wrap gap-1">
+                <BlogPostEditDialog postId={p.id} />
+                <BlogPostDeleteButton postId={p.id} />
               </div>
             </div>
           ))
         )}
       </GlassCard>
+      {totalPages > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+          <p>
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link
+                href={`/admin/cms?tab=blog&page=${page - 1}`}
+                className="rounded-lg border border-border px-3 py-1.5 hover:bg-foreground/5"
+              >
+                Prev
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link
+                href={`/admin/cms?tab=blog&page=${page + 1}`}
+                className="rounded-lg border border-border px-3 py-1.5 hover:bg-foreground/5"
+              >
+                Next
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

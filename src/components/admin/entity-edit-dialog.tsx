@@ -147,7 +147,12 @@ export function EntityEditDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className={cn("glass-strong", dialogClassName)}>
+      <DialogContent
+        className={cn(
+          "glass-strong w-[min(calc(100vw-1.5rem),100%)] max-h-[90dvh] overflow-y-auto sm:max-w-lg",
+          dialogClassName
+        )}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

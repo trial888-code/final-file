@@ -39,8 +39,8 @@ export default async function AdminGeoPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-7xl">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <AdminPageHeader
           title="Geo Pages"
           description="States and cities power the /[state] and /[state]/[city] landing pages. New entries appear without a redeploy."

@@ -46,7 +46,7 @@ export default async function AdminDepositsPage({
   const { data: deposits } = await query;
 
   return (
-    <div>
+    <div className="mx-auto max-w-7xl">
       <DepositsLiveRefresh />
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Deposit Requests</h1>

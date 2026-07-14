@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GameLoadActions } from "@/components/admin/game-load-actions";
 import { createClient } from "@/lib/supabase/client";
+import { searchAdminTransactionUsers } from "@/lib/actions/wallet";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
 import type { GameLoadRequest, GameLoadStatus } from "@/lib/game-automation/types";
-import { Search, Radio, User, X, Wallet } from "lucide-react";
+import { Search, Radio, User, X, Wallet, Loader2 } from "lucide-react";
 
 export interface AdminGameLoadRow extends GameLoadRequest {
   user?: { full_name?: string | null; email?: string } | null;
@@ -123,19 +124,42 @@ function LoadsPanel({
 
 interface AdminWalletLoadsPanelsProps {
   loads: AdminGameLoadRow[];
-  users: AdminGameLoadUser[];
+  users?: AdminGameLoadUser[];
+  /** Search users on demand instead of prefetching thousands of profiles. */
+  lazyUsers?: boolean;
 }
 
-export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWalletLoadsPanelsProps) {
+export function AdminWalletLoadsPanels({
+  loads: initialLoads,
+  users: initialUsers = [],
+  lazyUsers = false,
+}: AdminWalletLoadsPanelsProps) {
   const router = useRouter();
   const [loads, setLoads] = useState(initialLoads);
+  const [users, setUsers] = useState<AdminGameLoadUser[]>(initialUsers);
   const [userQuery, setUserQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [searchPending, startSearch] = useTransition();
 
   useEffect(() => {
     setLoads(initialLoads);
   }, [initialLoads]);
+
+  useEffect(() => {
+    if (!lazyUsers) return;
+    const timer = window.setTimeout(() => setDebouncedQuery(userQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [lazyUsers, userQuery]);
+
+  useEffect(() => {
+    if (!lazyUsers) return;
+    startSearch(async () => {
+      const result = await searchAdminTransactionUsers(debouncedQuery, 10);
+      if ("users" in result) setUsers(result.users);
+    });
+  }, [lazyUsers, debouncedQuery]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -160,6 +184,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
   }, [router]);
 
   const matchingUsers = useMemo(() => {
+    if (lazyUsers) return users;
     const q = userQuery.trim().toLowerCase();
     if (!q) return users.slice(0, 10);
     return users
@@ -169,7 +194,7 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
           u.email.toLowerCase().includes(q)
       )
       .slice(0, 10);
-  }, [users, userQuery]);
+  }, [users, userQuery, lazyUsers]);
 
   const selectedUser = users.find((u) => u.id === selectedUserId) ?? null;
 
@@ -194,9 +219,12 @@ export function AdminWalletLoadsPanels({ loads: initialLoads, users }: AdminWall
           <Input
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
-            placeholder="Filter by user name or email (optional)..."
+            placeholder="Filter by user name or email (optional)…"
             className="pl-9"
           />
+          {lazyUsers && searchPending && (
+            <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
         </div>
 
         {selectedUser ? (

@@ -5,7 +5,7 @@ export default async function AdminFraudPage() {
   const { users, error } = await getFlaggedFraudUsers();
 
   return (
-    <div>
+    <div className="mx-auto max-w-7xl">
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Fraud &amp; Multi-Account</h1>
         <p className="text-muted-foreground text-sm sm:text-base">

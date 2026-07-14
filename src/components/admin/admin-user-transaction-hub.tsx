@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { AdminTransactionRow } from "@/lib/actions/wallet";
+import {
+  getAdminUserTransactions,
+  searchAdminTransactionUsers,
+  type AdminTransactionUser,
+} from "@/lib/actions/wallet";
 import {
   formatTransactionAmount,
   transactionSourceLabel,
@@ -15,18 +21,16 @@ import {
   type WalletTransactionRow,
 } from "@/lib/wallet/transaction-display";
 import { formatDate, formatRelativeTime, cn } from "@/lib/utils";
-import { Search, Radio, User, X, Wallet, Gift } from "lucide-react";
+import { Search, Radio, User, X, Wallet, Loader2 } from "lucide-react";
 
-export interface AdminTransactionUser {
-  id: string;
-  full_name: string | null;
-  email: string;
-}
+export type { AdminTransactionUser };
 
 interface AdminUserTransactionHubProps {
-  users: AdminTransactionUser[];
-  transactions: AdminTransactionRow[];
+  users?: AdminTransactionUser[];
+  transactions?: AdminTransactionRow[];
   live?: boolean;
+  /** Load users and transactions on demand — much faster initial page load. */
+  lazy?: boolean;
 }
 
 function TransactionEntry({ row, compact }: { row: AdminTransactionRow; compact?: boolean }) {
@@ -109,11 +113,105 @@ function WalletColumn({
   );
 }
 
-export function AdminUserTransactionHub({ users, transactions, live }: AdminUserTransactionHubProps) {
+export function AdminUserTransactionHub({
+  users: initialUsers = [],
+  transactions: initialTransactions = [],
+  live,
+  lazy = false,
+}: AdminUserTransactionHubProps) {
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [users, setUsers] = useState<AdminTransactionUser[]>(initialUsers);
+  const [transactions, setTransactions] = useState<AdminTransactionRow[]>(initialTransactions);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [searchPending, startSearch] = useTransition();
+  const [txPending, startTxLoad] = useTransition();
+
+  useEffect(() => {
+    if (!lazy) return;
+    const timer = window.setTimeout(() => setDebouncedQuery(userQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [lazy, userQuery]);
+
+  useEffect(() => {
+    if (!lazy) return;
+    startSearch(async () => {
+      const result = await searchAdminTransactionUsers(debouncedQuery, 12);
+      if ("users" in result) setUsers(result.users);
+    });
+  }, [lazy, debouncedQuery]);
+
+  useEffect(() => {
+    if (!lazy || !selectedUserId) return;
+    startTxLoad(async () => {
+      const result = await getAdminUserTransactions(selectedUserId);
+      if ("transactions" in result) setTransactions(result.transactions);
+    });
+  }, [lazy, selectedUserId]);
+
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === selectedUserId) ?? null,
+    [users, selectedUserId]
+  );
+
+  useEffect(() => {
+    if (!live || !selectedUserId) return;
+
+    const supabase = createClient();
+    if (!supabase) return;
+
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session || cancelled) return;
+
+      channel = supabase
+        .channel(`admin-wallet-tx-user-${selectedUserId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "wallet_transactions",
+            filter: `user_id=eq.${selectedUserId}`,
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown>;
+            const entry: AdminTransactionRow = {
+              id: String(row.id),
+              amount: Number(row.amount),
+              wallet_type: String(row.wallet_type),
+              transaction_type: String(row.transaction_type),
+              source: String(row.source),
+              description: (row.description as string | null) ?? null,
+              created_at: String(row.created_at),
+              user: selectedUser
+                ? {
+                    id: selectedUser.id,
+                    full_name: selectedUser.full_name,
+                    email: selectedUser.email,
+                  }
+                : null,
+            };
+
+            setTransactions((prev) => {
+              if (prev.some((t) => t.id === entry.id)) return prev;
+              return [entry, ...prev];
+            });
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [live, selectedUserId, selectedUser]);
 
   const matchingUsers = useMemo(() => {
+    if (lazy) return users;
     const q = userQuery.trim().toLowerCase();
     if (!q) return users.slice(0, 12);
     return users
@@ -123,12 +221,7 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
           u.email.toLowerCase().includes(q)
       )
       .slice(0, 12);
-  }, [users, userQuery]);
-
-  const selectedUser = useMemo(
-    () => users.find((u) => u.id === selectedUserId) ?? null,
-    [users, selectedUserId]
-  );
+  }, [users, userQuery, lazy]);
 
   const userTransactions = useMemo(() => {
     if (!selectedUserId) return { deposit: [], bonus: [] };
@@ -147,9 +240,12 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
           <Input
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
-            placeholder="Search user by name or email (e.g. Jerzey longo)..."
+            placeholder="Search user by name or email…"
             className="pl-9"
           />
+          {(searchPending || txPending) && (
+            <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          )}
         </div>
 
         {!selectedUser && (
@@ -164,6 +260,8 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
                 onClick={() => {
                   setSelectedUserId(u.id);
                   setUserQuery(u.full_name || u.email);
+                  if (!lazy) return;
+                  setTransactions([]);
                 }}
               >
                 <span className="font-medium">{u.full_name || "Unnamed"}</span>
@@ -206,6 +304,7 @@ export function AdminUserTransactionHub({ users, transactions, live }: AdminUser
                   onClick={() => {
                     setSelectedUserId(null);
                     setUserQuery("");
+                    if (lazy) setTransactions([]);
                   }}
                 >
                   <X className="h-4 w-4 mr-1" />

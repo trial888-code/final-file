@@ -111,6 +111,70 @@ export function CrmPlayersPanel({
       </div>
 
       <GlassCard className={cn("overflow-hidden p-0 transition-opacity", pending && "opacity-60")}>
+        {/* Mobile cards */}
+        <div className="divide-y divide-foreground/8 md:hidden">
+          {data.rows.length === 0 ? (
+            <p className="py-10 text-center text-muted-foreground">No players in this segment.</p>
+          ) : (
+            data.rows.map(({ profile: p, vip, deposits: stats }) => (
+              <div key={p.id} className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {profileDisplayName(p)}
+                      {profileIsBanned(p) && (
+                        <Badge className="ml-2 bg-ws-danger/20 text-ws-danger text-xs">
+                          Suspended
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{profileHandle(p)}</p>
+                  </div>
+                  <Button asChild variant="outline" size="sm" className="shrink-0">
+                    <Link href={`/admin/users/${p.id}`}>View</Link>
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="bg-foreground/8 text-xs">Lv {profileNum(p.level, 1)}</Badge>
+                  {vip && (
+                    <Badge
+                      className="text-xs"
+                      style={{ backgroundColor: `${vip.color}22`, color: vip.color }}
+                    >
+                      {vip.name}
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Coins</p>
+                    <p className="tnum font-medium">{profileNum(p.coins_balance).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Deposits</p>
+                    {stats && stats.fulfilledCount > 0 ? (
+                      <p className="tnum font-medium text-ws-emerald">
+                        ${stats.totalDeposited.toLocaleString()}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">—</p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{p.email || "No email"}</p>
+                <p className="text-xs text-ws-text-faint">
+                  Last seen{" "}
+                  {p.last_seen_at
+                    ? formatDistanceToNow(new Date(p.last_seen_at), { addSuffix: true })
+                    : "never"}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow className="border-foreground/8 hover:bg-transparent">
@@ -218,10 +282,11 @@ export function CrmPlayersPanel({
             )}
           </TableBody>
         </Table>
+        </div>
       </GlassCard>
 
       {data.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
             Page {data.page} of {data.totalPages} &middot; {data.total.toLocaleString()} players
           </p>

@@ -9,11 +9,33 @@ import {
 } from "@/components/admin/admin-user-transaction-hub";
 
 interface AdminTransactionsLiveProps {
-  users: AdminTransactionUser[];
-  initialTransactions: AdminTransactionRow[];
+  users?: AdminTransactionUser[];
+  initialTransactions?: AdminTransactionRow[];
+  /** Skip heavy upfront fetch — search users and load txs on demand. */
+  lazy?: boolean;
 }
 
-export function AdminTransactionsLive({ users, initialTransactions }: AdminTransactionsLiveProps) {
+export function AdminTransactionsLive({
+  users = [],
+  initialTransactions = [],
+  lazy = false,
+}: AdminTransactionsLiveProps) {
+  if (lazy) {
+    return <AdminUserTransactionHub lazy live />;
+  }
+
+  return (
+    <AdminTransactionsLiveEager users={users} initialTransactions={initialTransactions} />
+  );
+}
+
+function AdminTransactionsLiveEager({
+  users,
+  initialTransactions,
+}: {
+  users: AdminTransactionUser[];
+  initialTransactions: AdminTransactionRow[];
+}) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [live, setLive] = useState(false);
 

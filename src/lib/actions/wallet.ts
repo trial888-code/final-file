@@ -204,6 +204,62 @@ export async function getAdminAllTransactions(): Promise<
   return { transactions };
 }
 
+export interface AdminTransactionUser {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
+export async function searchAdminTransactionUsers(
+  query: string,
+  limit = 12
+): Promise<{ users: AdminTransactionUser[] } | { error: string }> {
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+
+  let dbQuery = auth
+    .supabase!.from("profiles")
+    .select("id, full_name, email")
+    .order("full_name", { ascending: true, nullsFirst: false })
+    .limit(limit);
+
+  const q = query.trim();
+  if (q) {
+    dbQuery = dbQuery.or(`email.ilike.%${q}%,full_name.ilike.%${q}%`);
+  }
+
+  const { data, error } = await dbQuery;
+  if (error) return { error: error.message };
+  return { users: (data ?? []) as AdminTransactionUser[] };
+}
+
+export async function getAdminUserTransactions(
+  userId: string
+): Promise<{ transactions: AdminTransactionRow[] } | { error: string }> {
+  const auth = await requireAdmin();
+  if (auth.error) return { error: auth.error };
+
+  const { data, error } = await auth
+    .supabase!.from("wallet_transactions")
+    .select(ADMIN_TX_SELECT)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (error) {
+    if (error.message.includes("wallet_transactions")) {
+      return { error: "Run supabase/wallets.sql in Supabase." };
+    }
+    return { error: error.message };
+  }
+
+  const transactions = await attachProfilesToTransactions(
+    auth.supabase!,
+    (data ?? []) as Array<Record<string, unknown>>
+  );
+  return { transactions };
+}
+
 export interface AdminUserBonusActivity {
   transactions: Array<{
     id: string;
