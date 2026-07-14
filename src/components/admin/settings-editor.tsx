@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { updateSettingAction } from "@/lib/actions/admin/settings";
+import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
+import { sendTelegramPromoNowAction, updateSettingAction } from "@/lib/actions/admin/settings";
 import type { Json } from "@/lib/database.types";
 
 type Settings = Record<string, Json>;
@@ -139,15 +140,24 @@ export function SettingsEditor({ initial }: { initial: Settings }) {
             aria-label="Telegram promo broadcast enabled"
           />
         </div>
-        <Button
-          size="sm"
-          className="mt-4"
-          disabled={pending}
-          onClick={() => save("telegram_promo", { enabled: promoEnabled })}
-        >
-          {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          Save
-        </Button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            disabled={pending}
+            onClick={() => save("telegram_promo", { enabled: promoEnabled })}
+          >
+            {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            Save
+          </Button>
+          <ConfirmActionButton
+            action={sendTelegramPromoNowAction}
+            title="Send promo to Telegram now?"
+            description="Posts the next message in the rotation pool to your promo channel immediately (same as the hourly cron)."
+            confirmLabel="Send now"
+            triggerLabel="Send test now"
+            variant="outline"
+          />
+        </div>
       </GlassCard>
 
       {/* welcome bonus */}

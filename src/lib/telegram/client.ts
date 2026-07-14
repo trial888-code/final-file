@@ -1,5 +1,8 @@
 const TELEGRAM_API = "https://api.telegram.org";
 
+export type TelegramOutboundChannel = "admin" | "promo";
+
+/** Same bot used for admin alerts (deposits, messages, etc.). */
 function getBotToken(): string | null {
   return process.env.TELEGRAM_BOT_TOKEN?.trim() || null;
 }
@@ -14,8 +17,31 @@ function getAdminChatIds(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Where hourly promos post. Defaults to TELEGRAM_ADMIN_CHAT_ID when unset —
+ * same bot, same group/channel you already use for admin alerts.
+ */
+function getPromoChatIds(): string[] {
+  const raw =
+    process.env.TELEGRAM_PROMO_CHAT_ID?.trim() ||
+    process.env.TELEGRAM_ADMIN_CHAT_ID?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function getChatIds(channel: TelegramOutboundChannel): string[] {
+  return channel === "promo" ? getPromoChatIds() : getAdminChatIds();
+}
+
 export function isTelegramConfigured(): boolean {
   return Boolean(getBotToken() && getAdminChatIds().length > 0);
+}
+
+export function isTelegramPromoConfigured(): boolean {
+  return Boolean(getBotToken() && getPromoChatIds().length > 0);
 }
 
 /** Escape dynamic text for Telegram HTML parse mode. */
@@ -65,13 +91,13 @@ async function sendPhotoToChat(
 export async function sendTelegramPhoto(
   photoUrl: string,
   caption: string,
-  options?: { disableNotification?: boolean }
+  options?: { disableNotification?: boolean; channel?: TelegramOutboundChannel }
 ): Promise<{ ok: boolean; error?: string }> {
   const token = getBotToken();
-  const chatIds = getAdminChatIds();
+  const chatIds = getChatIds(options?.channel ?? "admin");
 
   if (!token || chatIds.length === 0) {
-    return { ok: false, error: "Telegram is not configured" };
+    return { ok: false, error: "Telegram is not configured for this channel" };
   }
 
   const disableNotification = options?.disableNotification ?? false;
@@ -100,7 +126,7 @@ async function sendToChat(
         chat_id: chatId,
         text,
         parse_mode: "HTML",
-        disable_web_page_preview: true,
+        disable_web_page_preview: false,
         disable_notification: disableNotification,
       }),
       cache: "no-store",
@@ -123,13 +149,13 @@ async function sendToChat(
 
 export async function sendTelegramMessage(
   text: string,
-  options?: { disableNotification?: boolean }
+  options?: { disableNotification?: boolean; channel?: TelegramOutboundChannel }
 ): Promise<{ ok: boolean; error?: string }> {
   const token = getBotToken();
-  const chatIds = getAdminChatIds();
+  const chatIds = getChatIds(options?.channel ?? "admin");
 
   if (!token || chatIds.length === 0) {
-    return { ok: false, error: "Telegram is not configured" };
+    return { ok: false, error: "Telegram is not configured for this channel" };
   }
 
   const disableNotification = options?.disableNotification ?? false;

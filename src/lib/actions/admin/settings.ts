@@ -96,3 +96,22 @@ export async function deleteTelegramPromoMessageAction(id: string): Promise<Admi
   revalidatePath("/admin/settings");
   return { ok: true, message: "Deleted." };
 }
+
+/** Manual test — posts the next promo in the rotation immediately. */
+export async function sendTelegramPromoNowAction(): Promise<AdminActionResult> {
+  const auth = await authorize("settings.manage");
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const { runTelegramPromoBroadcast } = await import("@/lib/telegram/promo-broadcast");
+  const result = await runTelegramPromoBroadcast();
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  if (result.status === "skipped") {
+    return { ok: false, error: result.reason };
+  }
+
+  return { ok: true, message: `Sent to Telegram: "${result.preview}"` };
+}
