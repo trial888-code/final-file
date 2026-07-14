@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/telegram-promo",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
