@@ -39,6 +39,7 @@ import {
 } from "@/lib/chat/message-notification-sound";
 import { ensureUserConversation } from "@/lib/actions/messages";
 import { ensureUserConversationClient } from "@/lib/chat/ensure-user-conversation-client";
+import { FloatingSocialLinks } from "@/components/layout/social-links";
 import { messagePreview } from "@/lib/chat/message-preview";
 import type { GameRequest, Message } from "@/types/database";
 
@@ -676,9 +677,11 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
       {children}
 
       {!hideFab && isLoggedIn && (
-        <button
-          type="button"
-          onClick={() => {
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] sm:bottom-6 sm:right-6 z-[130] flex flex-col items-center gap-2 pointer-events-none">
+          <FloatingSocialLinks />
+          <button
+            type="button"
+            onClick={() => {
             void unlockMessageNotificationSound();
             if (onAdminRoute) {
               setQuickChatOpen(false);
@@ -721,7 +724,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
               }
             })();
           }}
-          className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] sm:bottom-6 sm:right-6 z-[130] w-14 h-14 rounded-full gradient-bg flex items-center justify-center shadow-lg glow-purple touch-manipulation pointer-events-auto"
+          className="relative w-14 h-14 rounded-full gradient-bg flex items-center justify-center shadow-lg glow-purple touch-manipulation pointer-events-auto"
           aria-label={onAdminRoute ? "Open customer chat" : "Open live chat"}
         >
           <MessageCircle className="h-6 w-6 text-white" />
@@ -731,6 +734,7 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
             </span>
           )}
         </button>
+        </div>
       )}
 
       {!onAdminRoute && !onInboxPage && isLoggedIn && quickChatOpen && quickChatConvId && activeUserId && (

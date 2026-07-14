@@ -62,7 +62,7 @@ export const PUBLIC_ROUTES = [
 export const SOCIAL_LINKS = {
   telegram:
     process.env.NEXT_PUBLIC_TELEGRAM_URL ||
-    "https://t.me/+Y80HSM0UiZw5ODdh",
+    "https://telegram.me/jameswtm",
   facebook:
     process.env.NEXT_PUBLIC_FACEBOOK_URL ||
     "https://www.facebook.com/share/19ea1cSC5W/",

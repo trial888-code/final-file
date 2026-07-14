@@ -48,6 +48,10 @@ const socialItems = [
   },
 ];
 
+const floatingSocialItems = socialItems.filter((item) =>
+  ["Telegram", "Facebook", "Instagram"].includes(item.name)
+);
+
 export function SocialLinks({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
@@ -59,6 +63,26 @@ export function SocialLinks({ className = "" }: { className?: string }) {
           rel="noopener noreferrer"
           aria-label={`Follow Spinora on ${item.name}`}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50 text-muted-foreground border border-border hover:text-white hover:border-primary hover:bg-primary/20 transition-all duration-200"
+        >
+          {item.icon}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** Stacked social icons above the floating live chat button. */
+export function FloatingSocialLinks() {
+  return (
+    <div className="flex flex-col items-center gap-2 pointer-events-auto">
+      {floatingSocialItems.map((item) => (
+        <a
+          key={item.name}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open Spinora on ${item.name}`}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#1a1a1a]/95 text-white/80 shadow-lg backdrop-blur-sm transition-all duration-200 hover:border-primary/50 hover:bg-primary/20 hover:text-white"
         >
           {item.icon}
         </a>
