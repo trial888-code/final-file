@@ -1,10 +1,12 @@
 import type { NewsletterCampaign } from "@/lib/database.types";
+import type { NewsletterVibe } from "@/lib/email/newsletter-templates";
 import { presetToSimpleForm } from "@/lib/email/newsletter-presets";
 
 const DEFAULT_CTA_HREF = "https://spinoracasinos.com/promotions";
 
 export type SimpleNewsletterInput = {
   template_id: string;
+  vibe: NewsletterVibe;
   name: string;
   subject: string;
   eyebrow: string;
@@ -27,6 +29,7 @@ export function campaignToSimpleForm(c?: NewsletterCampaign): SimpleNewsletterIn
 
   return {
     template_id: "custom",
+    vibe: "gold",
     name: c.name ?? "",
     subject: c.subject ?? "",
     eyebrow: c.eyebrow ?? "Spinora",

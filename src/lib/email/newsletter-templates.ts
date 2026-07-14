@@ -4,15 +4,20 @@
 
 import { SITE_NAME, SITE_URL } from "@/lib/constants";
 
-const BG = "#060606";
-const SURFACE = "#0f1115";
+const BG = "#050505";
+const SURFACE = "#111111";
+const CARD = "#181818";
 const GOLD = "#f5c542";
-const GOLD_BRIGHT = "#ffd86b";
-const GOLD_DEEP = "#d99a1b";
-const GREEN = "#00d084";
-const TEXT = "#f4f1ea";
-const MUTED = "#a8a29a";
-const BORDER = "rgba(255,255,255,0.08)";
+const GOLD_BRIGHT = "#ffe082";
+const GOLD_DEEP = "#c8860a";
+const ORANGE = "#f97316";
+const ORANGE_DEEP = "#c2410c";
+const EMERALD = "#34d399";
+const RUBY = "#f87171";
+const TEXT = "#fafafa";
+const MUTED = "#b0aaa0";
+const BORDER = "rgba(255,255,255,0.1)";
+const GOLD_GLOW = "rgba(245, 197, 66, 0.35)";
 
 interface Stat {
   value: string;
@@ -27,30 +32,88 @@ interface NewsletterOpts {
   stats?: Stat[];
   cta: { label: string; href: string };
   promoCode?: string;
+  /** Visual accent — auto-matched from promo vibe */
+  vibe?: "gold" | "fire" | "vip" | "jackpot";
+}
+
+function vibeColors(vibe: NewsletterOpts["vibe"]) {
+  switch (vibe) {
+    case "fire":
+      return {
+        accent: ORANGE,
+        accentBright: "#fb923c",
+        accentDeep: ORANGE_DEEP,
+        heroTop: "#2a1206",
+        heroBottom: "#141010",
+        badgeBg: "rgba(249,115,22,0.18)",
+        badgeText: "#fdba74",
+      };
+    case "vip":
+      return {
+        accent: "#a78bfa",
+        accentBright: "#c4b5fd",
+        accentDeep: "#7c3aed",
+        heroTop: "#1a1030",
+        heroBottom: "#100e18",
+        badgeBg: "rgba(167,139,250,0.18)",
+        badgeText: "#ddd6fe",
+      };
+    case "jackpot":
+      return {
+        accent: EMERALD,
+        accentBright: "#6ee7b7",
+        accentDeep: "#059669",
+        heroTop: "#061a12",
+        heroBottom: "#0e1410",
+        badgeBg: "rgba(52,211,153,0.18)",
+        badgeText: "#a7f3d0",
+      };
+    default:
+      return {
+        accent: GOLD,
+        accentBright: GOLD_BRIGHT,
+        accentDeep: GOLD_DEEP,
+        heroTop: "#221808",
+        heroBottom: "#141010",
+        badgeBg: "rgba(245, 197, 66, 0.16)",
+        badgeText: GOLD_BRIGHT,
+      };
+  }
+}
+
+function statChip(s: Stat, accent: string, accentBright: string) {
+  return `<td width="33%" align="center" style="padding:0 4px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CARD};border:2px solid ${accent};border-radius:16px;">
+      <tr><td align="center" style="padding:14px 6px 4px;">
+        <p style="margin:0;font-size:26px;line-height:1;font-weight:900;color:${accentBright};font-family:Georgia,'Times New Roman',serif;">${s.value}</p>
+      </td></tr>
+      <tr><td align="center" style="padding:0 8px 12px;">
+        <p style="margin:0;font-size:9px;font-weight:800;color:${MUTED};text-transform:uppercase;letter-spacing:0.12em;">${s.label}</p>
+      </td></tr>
+    </table>
+  </td>`;
 }
 
 function newsletterShell(opts: NewsletterOpts) {
   const preheader = opts.subhead || opts.heading;
+  const v = vibeColors(opts.vibe);
+
   const statsRow = opts.stats?.length
-    ? `<tr><td style="padding:0 32px 24px;">
+    ? `<tr><td style="padding:0 24px 20px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            ${opts.stats
-              .map(
-                (s) => `<td align="center" style="padding:12px 4px;background:${BG};border:1px solid ${BORDER};border-radius:12px;">
-                  <p style="margin:0;font-size:20px;font-weight:800;color:${GOLD};">${s.value}</p>
-                  <p style="margin:2px 0 0;font-size:11px;color:${MUTED};text-transform:uppercase;letter-spacing:0.04em;">${s.label}</p>
-                </td>`
-              )
-              .join(`<td width="8"></td>`)}
-          </tr>
+          <tr>${opts.stats.map((s) => statChip(s, v.accent, v.accentBright)).join("")}</tr>
         </table>
       </td></tr>`
     : "";
 
   const promoRow = opts.promoCode
-    ? `<tr><td style="padding:0 32px 24px;" align="center">
-        <span style="display:inline-block;border:1px dashed ${GOLD_DEEP};color:${GOLD_BRIGHT};font-weight:800;letter-spacing:0.1em;padding:8px 20px;border-radius:10px;font-size:14px;">${opts.promoCode}</span>
+    ? `<tr><td style="padding:0 24px 20px;" align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" style="border:2px dashed ${v.accent};border-radius:12px;background:${CARD};">
+          <tr><td style="padding:12px 28px;">
+            <p style="margin:0 0 4px;font-size:10px;font-weight:800;color:${MUTED};text-transform:uppercase;letter-spacing:0.14em;">Promo code</p>
+            <p style="margin:0;font-size:22px;font-weight:900;color:${v.accentBright};letter-spacing:0.18em;font-family:Georgia,'Times New Roman',serif;">${opts.promoCode}</p>
+          </td></tr>
+        </table>
       </td></tr>`
     : "";
 
@@ -63,34 +126,57 @@ function newsletterShell(opts: NewsletterOpts) {
   </head>
   <body style="margin:0;padding:0;background:${BG};color:${TEXT};font-family:'Helvetica Neue',Arial,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:32px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:24px 12px;">
       <tr><td align="center">
-        <table role="presentation" width="100%" style="max-width:520px;background:${SURFACE};border:1px solid ${BORDER};border-radius:16px;overflow:hidden;">
-          <tr><td style="padding:32px 32px 0;">
-            <p style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${GOLD};">Spinora</p>
+        <table role="presentation" width="100%" style="max-width:560px;background:${SURFACE};border:1px solid ${BORDER};border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+          <!-- Gold top strip -->
+          <tr><td style="height:5px;background:linear-gradient(90deg,${v.accentDeep},${v.accentBright},${ORANGE},${v.accentBright},${v.accentDeep});font-size:0;line-height:0;">&nbsp;</td></tr>
+          <!-- Logo bar -->
+          <tr><td style="padding:20px 24px 0;background:linear-gradient(180deg,${v.heroTop},${SURFACE});">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <p style="margin:0;font-size:22px;font-weight:900;letter-spacing:0.06em;color:${v.accentBright};font-family:Georgia,'Times New Roman',serif;">♠ ${SITE_NAME.toUpperCase()} ♠</p>
+                </td>
+                <td align="right" style="font-size:18px;color:${v.accent};letter-spacing:4px;">✦ ✦ ✦</td>
+              </tr>
+            </table>
           </td></tr>
-          <tr><td style="padding:20px 32px 0;">
-            <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${GREEN};">${opts.eyebrow}</p>
-          </td></tr>
-          <tr><td style="padding:8px 32px 0;">
-            <h1 style="margin:0;font-size:26px;line-height:1.2;font-weight:800;color:${TEXT};">${opts.heading}</h1>
-          </td></tr>
-          <tr><td style="padding:8px 32px 20px;">
-            <p style="margin:0;font-size:15px;color:${MUTED};">${opts.subhead}</p>
+          <!-- Hero -->
+          <tr><td style="padding:16px 24px 20px;background:linear-gradient(180deg,${v.heroTop},${v.heroBottom});">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CARD};border:1px solid ${GOLD_GLOW};border-radius:16px;">
+              <tr><td style="padding:20px 20px 16px;">
+                <p style="margin:0 0 12px;display:inline-block;background:${v.badgeBg};color:${v.badgeText};font-size:11px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;padding:6px 14px;border-radius:999px;border:1px solid ${v.accent};">${opts.eyebrow}</p>
+                <h1 style="margin:0 0 10px;font-size:30px;line-height:1.1;font-weight:900;color:${TEXT};font-family:Georgia,'Times New Roman',serif;">${opts.heading}</h1>
+                <p style="margin:0;font-size:16px;line-height:1.45;color:${MUTED};">${opts.subhead}</p>
+              </td></tr>
+            </table>
           </td></tr>
           ${statsRow}
-          <tr><td style="padding:0 32px 24px;">
-            <div style="font-size:15px;line-height:1.6;color:${MUTED};">${opts.body}</div>
+          <!-- Body -->
+          <tr><td style="padding:0 24px 20px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-left:3px solid ${v.accent};background:${CARD};border-radius:0 12px 12px 0;">
+              <tr><td style="padding:16px 18px;">
+                <div style="font-size:15px;line-height:1.65;color:#d4d0c8;">${opts.body}</div>
+              </td></tr>
+            </table>
           </td></tr>
           ${promoRow}
-          <tr><td style="padding:0 32px 32px;" align="center">
-            <a href="${opts.cta.href}" style="display:inline-block;background:linear-gradient(135deg,${GOLD_BRIGHT},${GOLD_DEEP});color:#1a1405;font-weight:800;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:14px;text-transform:uppercase;letter-spacing:0.05em;">${opts.cta.label}</a>
+          <!-- CTA -->
+          <tr><td style="padding:4px 24px 28px;" align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="border-radius:999px;background:linear-gradient(135deg,${v.accentBright},${v.accentDeep});box-shadow:0 6px 28px ${GOLD_GLOW};">
+                <a href="${opts.cta.href}" style="display:inline-block;color:#1a0f00;font-weight:900;text-decoration:none;padding:18px 40px;border-radius:999px;font-size:15px;text-transform:uppercase;letter-spacing:0.08em;border:2px solid ${v.accentBright};">${opts.cta.label} →</a>
+              </td></tr>
+            </table>
+            <p style="margin:14px 0 0;font-size:11px;color:${MUTED};">Instant credit · 12 games · 24/7 support</p>
           </td></tr>
-          <tr><td style="padding:24px 32px;border-top:1px solid ${BORDER};">
-            <p style="margin:0;font-size:12px;color:${MUTED};">You're receiving this because you have a ${SITE_NAME} account. <a href="${SITE_URL}/dashboard/settings" style="color:${MUTED};">Manage email preferences</a> or reply with "unsubscribe".</p>
+          <!-- Footer -->
+          <tr><td style="padding:20px 24px;border-top:1px solid ${BORDER};background:${BG};">
+            <p style="margin:0;font-size:11px;line-height:1.5;color:${MUTED};">You're receiving this because you have a ${SITE_NAME} account. <a href="${SITE_URL}/dashboard/settings" style="color:${v.accentBright};">Manage email preferences</a> · reply "unsubscribe" to opt out.</p>
           </td></tr>
         </table>
-        <p style="margin:16px 0 0;font-size:11px;color:${MUTED};">© ${new Date().getFullYear()} ${SITE_NAME} · ${SITE_URL.replace(/^https?:\/\//, "")}</p>
+        <p style="margin:14px 0 0;font-size:10px;color:#666;">© ${new Date().getFullYear()} ${SITE_NAME} · Play responsibly · ${SITE_URL.replace(/^https?:\/\//, "")}</p>
       </td></tr>
     </table>
   </body>
@@ -277,11 +363,51 @@ export function seasonalHolidayNewsletter(opts: { siteUrl: string; seasonName: s
   };
 }
 
+export type NewsletterVibe = "gold" | "fire" | "vip" | "jackpot";
+
+export function inferNewsletterVibe(fields: {
+  subject?: string;
+  eyebrow?: string;
+  heading?: string;
+  template_id?: string;
+}): NewsletterVibe {
+  const id = fields.template_id ?? "";
+  if (id === "vip-climb") return "vip";
+  if (id === "happy-hour" || id === "reload-weekend" || id === "trending-juwa" || id === "win-back")
+    return "fire";
+  if (
+    id === "daily-spin" ||
+    id === "leaderboard" ||
+    id === "refer-friends" ||
+    id === "welcome-50"
+  )
+    return "jackpot";
+
+  const text = `${fields.subject ?? ""} ${fields.eyebrow ?? ""} ${fields.heading ?? ""}`.toLowerCase();
+  if (text.includes("vip") || text.includes("elite") || text.includes("platinum")) return "vip";
+  if (
+    text.includes("happy") ||
+    text.includes("weekend") ||
+    text.includes("hot") ||
+    text.includes("juwa") ||
+    text.includes("fire") ||
+    text.includes("come back")
+  )
+    return "fire";
+  if (
+    text.includes("spin") ||
+    text.includes("leaderboard") ||
+    text.includes("refer") ||
+    text.includes("welcome") ||
+    text.includes("bonus")
+  )
+    return "jackpot";
+  return "gold";
+}
+
 /**
  * Renders a fully admin-authored campaign (subject + all shell fields
- * supplied at call time) — the counterpart to the themed functions above,
- * used by the admin Newsletters section so staff aren't limited to the 10
- * built-in themes.
+ * supplied at call time) — used by the admin Newsletters section.
  */
 export function customCampaignEmail(opts: {
   subject: string;
@@ -291,7 +417,10 @@ export function customCampaignEmail(opts: {
   body: string;
   stats?: Stat[];
   cta: { label: string; href: string };
+  vibe?: NewsletterVibe;
+  template_id?: string;
 }) {
+  const vibe = opts.vibe ?? inferNewsletterVibe(opts);
   return {
     subject: opts.subject,
     html: newsletterShell({
@@ -301,6 +430,7 @@ export function customCampaignEmail(opts: {
       body: opts.body,
       stats: opts.stats,
       cta: opts.cta,
+      vibe,
     }),
   };
 }

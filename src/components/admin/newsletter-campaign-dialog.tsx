@@ -104,6 +104,8 @@ export function NewsletterCampaignDialog({
     body: payload.body,
     stats: stats.length ? stats : undefined,
     cta: { label: payload.cta_label, href: payload.cta_href },
+    vibe: values.vibe,
+    template_id: values.template_id,
   });
 
   const selectedPreset = NEWSLETTER_PRESETS.find((p) => p.id === values.template_id);
