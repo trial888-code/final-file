@@ -67,7 +67,7 @@ function newsletterShell(opts: NewsletterOpts) {
       <tr><td align="center">
         <table role="presentation" width="100%" style="max-width:520px;background:${SURFACE};border:1px solid ${BORDER};border-radius:16px;overflow:hidden;">
           <tr><td style="padding:32px 32px 0;">
-            <p style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${GOLD};">WinSweeps</p>
+            <p style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.02em;color:${GOLD};">Spinora</p>
           </td></tr>
           <tr><td style="padding:20px 32px 0;">
             <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${GREEN};">${opts.eyebrow}</p>

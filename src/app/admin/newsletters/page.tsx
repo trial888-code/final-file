@@ -4,10 +4,9 @@ import { format } from "date-fns";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import {
-  EntityEditDialog,
-  type FieldValue,
-} from "@/components/admin/entity-edit-dialog";
-import { NewsletterCampaignDialog } from "@/components/admin/newsletter-campaign-dialog";
+  NewsletterCampaignDialog,
+  simpleFormToCampaignPayload,
+} from "@/components/admin/newsletter-campaign-dialog";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,66 +36,6 @@ const STATUS_BADGE: Record<NewsletterCampaignStatus, string> = {
   failed: "bg-destructive/15 text-destructive",
 };
 
-function campaignFields(c?: NewsletterCampaign) {
-  return [
-    { name: "name", label: "Internal name", type: "text" as const, defaultValue: c?.name ?? "" },
-    { name: "subject", label: "Subject line", type: "text" as const, defaultValue: c?.subject ?? "" },
-    { name: "eyebrow", label: "Eyebrow (small label above the heading)", type: "text" as const, defaultValue: c?.eyebrow ?? "" },
-    { name: "heading", label: "Heading", type: "text" as const, defaultValue: c?.heading ?? "" },
-    { name: "subhead", label: "Subhead", type: "textarea" as const, defaultValue: c?.subhead ?? "" },
-    {
-      name: "body",
-      label: "Body",
-      type: "textarea" as const,
-      defaultValue: c?.body ?? "",
-      hint: "Plain text — you can use <strong> for emphasis, it's rendered as raw HTML.",
-    },
-    { name: "cta_label", label: "Button label", type: "text" as const, defaultValue: c?.cta_label ?? "Play Now" },
-    { name: "cta_href", label: "Button link", type: "text" as const, defaultValue: c?.cta_href ?? "https://winsweeps.games/deposit" },
-    { name: "stat1_value", label: "Stat 1 value (optional)", type: "text" as const, defaultValue: c?.stat1_value ?? "" },
-    { name: "stat1_label", label: "Stat 1 label", type: "text" as const, defaultValue: c?.stat1_label ?? "" },
-    { name: "stat2_value", label: "Stat 2 value (optional)", type: "text" as const, defaultValue: c?.stat2_value ?? "" },
-    { name: "stat2_label", label: "Stat 2 label", type: "text" as const, defaultValue: c?.stat2_label ?? "" },
-    { name: "stat3_value", label: "Stat 3 value (optional)", type: "text" as const, defaultValue: c?.stat3_value ?? "" },
-    { name: "stat3_label", label: "Stat 3 label", type: "text" as const, defaultValue: c?.stat3_label ?? "" },
-    {
-      name: "segment",
-      label: "Send to",
-      type: "select" as const,
-      defaultValue: c?.segment ?? "all",
-      options: [
-        { value: "all", label: "All players (opted-in, not banned)" },
-        { value: "test", label: "Test — just me" },
-      ],
-    },
-  ];
-}
-
-function toCampaignInput(v: Record<string, FieldValue>) {
-  return {
-    name: String(v.name),
-    subject: String(v.subject),
-    eyebrow: String(v.eyebrow),
-    heading: String(v.heading),
-    subhead: String(v.subhead),
-    body: String(v.body),
-    cta_label: String(v.cta_label),
-    cta_href: String(v.cta_href),
-    stat1_value: String(v.stat1_value),
-    stat1_label: String(v.stat1_label),
-    stat2_value: String(v.stat2_value),
-    stat2_label: String(v.stat2_label),
-    stat3_value: String(v.stat3_value),
-    stat3_label: String(v.stat3_label),
-    segment: v.segment === "test" ? ("test" as const) : ("all" as const),
-  };
-}
-
-function defaultScheduleValue() {
-  const d = new Date(Date.now() + 5 * 60_000);
-  return d.toISOString().slice(0, 16);
-}
-
 export default async function AdminNewslettersPage() {
   await requirePermission("newsletters.manage");
   const db = adminDb();
@@ -110,20 +49,36 @@ export default async function AdminNewslettersPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <AdminPageHeader
-        title="Newsletters"
-        description="Author a campaign, send a test to yourself, then schedule or send it to every opted-in player."
+        title="Email promos"
+        description="Send promo emails to players who signed up on Spinora."
         action={
           <NewsletterCampaignDialog
-            title="New campaign"
+            title="New email promo"
             triggerLabel="New campaign"
-            fields={campaignFields()}
-            action={async (values: Record<string, FieldValue>) => {
+            action={async (values) => {
               "use server";
-              return upsertNewsletterCampaignAction(toCampaignInput(values));
+              return upsertNewsletterCampaignAction(simpleFormToCampaignPayload(values));
             }}
           />
         }
       />
+
+      <GlassCard className="mb-6 p-5">
+        <h2 className="font-semibold">Quick guide</h2>
+        <ol className="mt-3 space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+          <li>
+            <strong className="text-foreground">New campaign</strong> → write subject + message →
+            choose <strong className="text-foreground">Test — my email only</strong> → Save
+          </li>
+          <li>
+            Click <strong className="text-foreground">Send test</strong> → check your inbox
+          </li>
+          <li>
+            Edit campaign → change audience to <strong className="text-foreground">All players</strong>{" "}
+            → Save → <strong className="text-foreground">Send to everyone</strong>
+          </li>
+        </ol>
+      </GlassCard>
 
       <GlassCard className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -131,18 +86,18 @@ export default async function AdminNewslettersPage() {
             <TableHeader>
               <TableRow className="border-foreground/8 hover:bg-transparent">
                 <TableHead>Campaign</TableHead>
-                <TableHead>Segment</TableHead>
+                <TableHead>Audience</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Scheduled / Sent</TableHead>
+                <TableHead>Sent</TableHead>
                 <TableHead className="text-right">Progress</TableHead>
-                <TableHead className="w-32 text-right">Actions</TableHead>
+                <TableHead className="w-40 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {campaigns.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                    No campaigns yet — create one above.
+                    No campaigns yet — click <strong>New campaign</strong> above.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -153,16 +108,16 @@ export default async function AdminNewslettersPage() {
                       <p className="text-xs text-muted-foreground">{c.subject}</p>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {c.segment === "test" ? "Test — just me" : "All players"}
+                      {c.segment === "test" ? "Test (you)" : "All players"}
                     </TableCell>
                     <TableCell>
                       <Badge className={STATUS_BADGE[c.status]}>{c.status}</Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {c.sent_at
-                        ? `Sent ${format(new Date(c.sent_at), "MMM d, p")}`
+                        ? format(new Date(c.sent_at), "MMM d, p")
                         : c.scheduled_at
-                          ? `Scheduled ${format(new Date(c.scheduled_at), "MMM d, p")}`
+                          ? `Queued ${format(new Date(c.scheduled_at), "MMM d, p")}`
                           : "—"}
                     </TableCell>
                     <TableCell className="tnum text-right text-sm">
@@ -172,30 +127,17 @@ export default async function AdminNewslettersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       {c.status === "draft" ? (
-                        <div className="flex justify-end gap-1">
+                        <div className="flex flex-wrap justify-end gap-1">
                           <NewsletterCampaignDialog
                             title="Edit campaign"
-                            fields={campaignFields(c)}
-                            action={async (values: Record<string, FieldValue>) => {
+                            initial={c}
+                            triggerLabel="Edit"
+                            action={async (values) => {
                               "use server";
-                              return upsertNewsletterCampaignAction({ id: c.id, ...toCampaignInput(values) });
-                            }}
-                          />
-                          <EntityEditDialog
-                            title="Schedule send"
-                            triggerLabel="Schedule"
-                            fields={[
-                              {
-                                name: "scheduled_at",
-                                label: "Send at",
-                                type: "datetime-local",
-                                defaultValue: defaultScheduleValue(),
-                              },
-                            ]}
-                            action={async (values: Record<string, FieldValue>) => {
-                              "use server";
-                              const iso = new Date(String(values.scheduled_at)).toISOString();
-                              return scheduleNewsletterCampaignAction(c.id, iso);
+                              return upsertNewsletterCampaignAction({
+                                id: c.id,
+                                ...simpleFormToCampaignPayload(values),
+                              });
                             }}
                           />
                           <ConfirmActionButton
@@ -203,14 +145,14 @@ export default async function AdminNewslettersPage() {
                               "use server";
                               return scheduleNewsletterCampaignAction(c.id, null);
                             }}
-                            title="Send this campaign now?"
+                            title="Send this email now?"
                             description={
                               c.segment === "test"
-                                ? "Sends immediately to your own email address."
-                                : "Sends immediately to every opted-in, non-banned player. This cannot be undone."
+                                ? "Sends to your email address only."
+                                : "Sends to every signed-up player who opted in. This cannot be undone."
                             }
-                            confirmLabel="Send now"
-                            triggerLabel="Send now"
+                            confirmLabel="Send"
+                            triggerLabel={c.segment === "test" ? "Send test" : "Send to everyone"}
                             variant="outline"
                           />
                           <ConfirmActionButton
@@ -222,7 +164,7 @@ export default async function AdminNewslettersPage() {
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {c.failed_count > 0 ? `${c.failed_count} failed` : "Locked"}
+                          {c.failed_count > 0 ? `${c.failed_count} failed` : "Done"}
                         </span>
                       )}
                     </TableCell>
