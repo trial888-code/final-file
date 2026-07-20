@@ -49,14 +49,18 @@ export function Navbar({ onMenuClick, onSearchClick }: NavbarProps = {}) {
     const supabase = createClient();
     if (!supabase) return;
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session?.user);
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session?.user);
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        setIsLoggedIn(true);
+      } else if (event === "SIGNED_OUT") {
+        setIsLoggedIn(false);
+      }
     });
 
     return () => subscription.unsubscribe();

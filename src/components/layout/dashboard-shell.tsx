@@ -3,13 +3,14 @@
 import { useEffect, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { AppShell } from "@/components/layout/app-shell";
+import { LobbyAppShell } from "@/components/home/lobby/lobby-app-shell";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   sidebar: ReactNode;
 }
 
+/** Dashboard uses the same VIP casino shell as the lobby. */
 export function DashboardShell({ children, sidebar }: DashboardShellProps) {
   const searchParams = useSearchParams();
 
@@ -20,8 +21,10 @@ export function DashboardShell({ children, sidebar }: DashboardShellProps) {
   }, [searchParams]);
 
   return (
-    <AppShell showTicker={false} showFooter={false} sidebar={sidebar}>
-      {children}
-    </AppShell>
+    <LobbyAppShell sidebar={sidebar}>
+      <div className="vip-page-content mx-auto max-w-5xl py-2 px-1 sm:px-2 pb-4">
+        {children}
+      </div>
+    </LobbyAppShell>
   );
 }

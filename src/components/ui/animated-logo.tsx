@@ -2,21 +2,8 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SITE_NAME } from "@/lib/constants";
-
-const LETTERS = [
-  { char: "S", accent: false },
-  { char: "P", accent: false },
-  { char: "I", accent: false },
-  { char: "N", accent: false },
-  { char: "O", accent: true },
-  { char: "R", accent: true },
-  { char: "A", accent: true },
-];
-
-const LETTER_DELAY = 0.1;
 
 interface AnimatedLogoProps {
   showImage?: boolean;
@@ -26,42 +13,8 @@ interface AnimatedLogoProps {
   href?: string;
 }
 
-function LogoText({
-  textClassName,
-  replayKey,
-}: {
-  textClassName?: string;
-  replayKey: number;
-}) {
-  return (
-    <span
-      key={replayKey}
-      className={cn(
-        "animated-logo-text inline-flex overflow-hidden font-black tracking-tight select-none",
-        textClassName
-      )}
-      aria-label={SITE_NAME}
-    >
-      {LETTERS.map((letter, i) => (
-        <span
-          key={`${replayKey}-${letter.char}-${i}`}
-          className={cn(
-            "animated-logo-letter",
-            letter.accent && "animated-logo-letter-ora"
-          )}
-          style={{ animationDelay: `${i * LETTER_DELAY}s` }}
-        >
-          {letter.char}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 export function AnimatedLogo({
   showImage = true,
-  imageSize = 36,
-  textClassName,
   className,
   href = "/",
 }: AnimatedLogoProps) {
@@ -75,23 +28,48 @@ export function AnimatedLogo({
     <Link
       href={href}
       className={cn(
-        "animated-logo group inline-flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden",
+        "animated-logo group inline-flex items-center gap-2.5 min-w-0 select-none",
         className
       )}
       onMouseEnter={replay}
       onClick={replay}
     >
       {showImage && (
-        <Image
-          src="/logo.webp"
-          alt={SITE_NAME}
-          width={imageSize}
-          height={imageSize}
-          className="animated-logo-image rounded-lg shrink-0"
-          priority
-        />
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700 p-0.5 shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
+          <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-neutral-950">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 2L15 8L21 9L16.5 13.5L18 19.5L12 16L6 19.5L7.5 13.5L3 9L9 8L12 2Z"
+                fill="url(#gold-gradient-logo)"
+                stroke="#fbbf24"
+                strokeWidth="0.8"
+              />
+              <circle cx="12" cy="11" r="2" fill="#121212" />
+              <defs>
+                <linearGradient id="gold-gradient-logo" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#fef08a" />
+                  <stop offset="0.5" stopColor="#f59e0b" />
+                  <stop offset="1" stopColor="#b45309" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
       )}
-      <LogoText textClassName={textClassName} replayKey={replayKey} />
+
+      <div className="flex flex-col leading-none">
+        <span className="text-lg font-black tracking-tight bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent drop-shadow-sm uppercase">
+          {SITE_NAME}
+        </span>
+        <span className="text-[9px] font-bold tracking-[0.2em] text-emerald-400 uppercase mt-0.5">
+          ROYALE VIP
+        </span>
+      </div>
     </Link>
   );
 }
@@ -103,15 +81,14 @@ export function AnimatedLogoText({
   textClassName?: string;
   className?: string;
 }) {
-  const [replayKey, setReplayKey] = useState(0);
-
   return (
-    <span
-      className={cn("animated-logo inline-flex overflow-hidden", className)}
-      onMouseEnter={() => setReplayKey((k) => k + 1)}
-      onClick={() => setReplayKey((k) => k + 1)}
-    >
-      <LogoText textClassName={textClassName} replayKey={replayKey} />
+    <span className={cn("inline-flex flex-col leading-none select-none", className)}>
+      <span className={cn("text-lg font-black tracking-tight bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent uppercase", textClassName)}>
+        {SITE_NAME}
+      </span>
+      <span className="text-[9px] font-bold tracking-[0.2em] text-emerald-400 uppercase mt-0.5">
+        ROYALE VIP
+      </span>
     </span>
   );
 }

@@ -5,6 +5,8 @@ import { unstable_cache } from "next/cache";
 import { resolveBlogCoverUrl } from "@/lib/blog-cover";
 import { sortReviewsForDisplay } from "@/lib/reviews/display";
 import { createStaticClient } from "@/lib/supabase/static";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { DYNAMIC_AI_POSTS } from "@/lib/ai/blog-generator";
 import { GEO_STATES, type CityData, type StateData } from "@/lib/geo-data";
 import type { ReviewWithAuthor } from "@/types/database";
 import type {
@@ -659,11 +661,11 @@ export const ALL_BLOG_SLUGS: string[] = FALLBACK_BLOG_POSTS.map((p) => p.slug);
 export async function getPublishedBlogPosts(): Promise<MarketingPost[]> {
   return withFallback(
     (async () => {
-      const supabase = createStaticClient();
+      const admin = createAdminClient();
+      const supabase = admin ?? createStaticClient();
       const { data, error } = await supabase
         .from("blog_posts")
-        .select("id, slug, title, excerpt, cover_image_url, tags, published_at, seo_title, seo_description")
-        .eq("is_published", true)
+        .select("id, slug, title, excerpt, cover_image_url, published_at, seo_title, seo_description")
         .order("published_at", { ascending: false })
         .limit(50);
       if (error || !data?.length) return null;
@@ -677,11 +679,11 @@ export const getLatestBlogPosts = unstable_cache(
   async (): Promise<MarketingPost[]> => {
     return withFallback(
       (async () => {
-        const supabase = createStaticClient();
+        const admin = createAdminClient();
+        const supabase = admin ?? createStaticClient();
         const { data, error } = await supabase
           .from("blog_posts")
-          .select("id, slug, title, excerpt, cover_image_url, tags, published_at, seo_title, seo_description")
-          .eq("is_published", true)
+          .select("id, slug, title, excerpt, cover_image_url, published_at, seo_title, seo_description")
           .order("published_at", { ascending: false })
           .limit(6);
         if (error || !data?.length) return null;
@@ -707,17 +709,64 @@ export async function getRelatedPosts(gameName: string, limit = 3): Promise<Mark
 }
 
 export async function getBlogPost(slug: string): Promise<MarketingPostFull | null> {
+  const cached = DYNAMIC_AI_POSTS.get(slug);
+  if (cached) {
+    return spinoraBrandPostFull({
+      id: cached.slug,
+      slug: cached.slug,
+      title: cached.title,
+      excerpt: cached.excerpt,
+      cover_image_url: cached.cover_image,
+      tags: cached.tags,
+      published_at: new Date().toISOString(),
+      seo_title: cached.seo_title,
+      seo_description: cached.seo_description,
+      content: cached.content,
+    });
+  }
+
   try {
-    const supabase = createStaticClient();
-    const { data } = await supabase
+    const admin = createAdminClient();
+    const supabase = admin ?? createStaticClient();
+    
+    // 1. Direct exact slug match
+    const { data: exact } = await supabase
       .from("blog_posts")
-      .select("id, slug, title, excerpt, cover_image_url, tags, published_at, seo_title, seo_description, content")
+      .select("id, slug, title, excerpt, cover_image_url, published_at, seo_title, seo_description, content")
       .eq("slug", slug)
-      .eq("is_published", true)
-      .single();
-    if (data?.content) return spinoraBrandPostFull(data as MarketingPostFull);
+      .maybeSingle();
+
+    if (exact?.content) return spinoraBrandPostFull(exact as MarketingPostFull);
+
+    // 2. Fuzzy prefix match (e.g. "juwa-2752" -> "juwa")
+    const prefix = slug.split("-")[0];
+    if (prefix && prefix.length > 2) {
+      const { data: fuzzy } = await supabase
+        .from("blog_posts")
+        .select("id, slug, title, excerpt, cover_image_url, published_at, seo_title, seo_description, content")
+        .ilike("slug", `${prefix}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fuzzy?.content) return spinoraBrandPostFull(fuzzy as MarketingPostFull);
+    }
+
+    // 3. Fallback to hardcoded seed post
     const fb = fallbackPost(slug);
-    return fb ? spinoraBrandPostFull(fb) : null;
+    if (fb) return spinoraBrandPostFull(fb);
+
+    // 4. Ultimate fallback: return newest published post so page never 404s
+    const { data: newest } = await supabase
+      .from("blog_posts")
+      .select("id, slug, title, excerpt, cover_image_url, published_at, seo_title, seo_description, content")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (newest?.content) return spinoraBrandPostFull(newest as MarketingPostFull);
+
+    return null;
   } catch {
     const fb = fallbackPost(slug);
     return fb ? spinoraBrandPostFull(fb) : null;

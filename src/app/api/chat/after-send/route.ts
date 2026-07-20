@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 import { notifyAdminOfCustomerMessage } from "@/lib/telegram/notify-admin-message";
+import { processAIChatQuery, getBotSenderProfileId } from "@/lib/ai/chatbot";
+import { getChatbotSettings } from "@/lib/ai/settings";
+import { isTelegramConfigured, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
+import { SITE_URL } from "@/lib/constants";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -95,6 +99,41 @@ export async function POST(request: Request) {
       content,
       attachmentType,
     });
+
+    const chatSettings = await getChatbotSettings();
+
+    if (content.trim() && chatSettings.is_enabled && chatSettings.auto_reply_enabled) {
+      void (async () => {
+        try {
+          const aiResult = await processAIChatQuery(content, conversationId, user.id);
+          const botSenderId = await getBotSenderProfileId();
+          const db = adminClient ?? supabase;
+
+          if (aiResult.shouldEscalateToHuman && chatSettings.telegram_escalation_enabled && isTelegramConfigured()) {
+            await sendTelegramMessage(
+              [
+                "🚨 <b>CHAT ESCALATION</b>",
+                `<b>User:</b> ${escapeTelegramHtml(user.id)}`,
+                `<b>Message:</b> ${escapeTelegramHtml(content.slice(0, 500))}`,
+                `<i>${SITE_URL}/admin/chat</i>`,
+              ].join("\n")
+            );
+            return;
+          }
+
+          if (aiResult.response && botSenderId) {
+            await db.from("messages").insert({
+              conversation_id: conversationId,
+              sender_id: botSenderId,
+              content: `🤖 ${aiResult.response}`,
+              is_read: false,
+            });
+          }
+        } catch (err) {
+          console.error("[AfterSend AI Auto-Reply Error]:", err);
+        }
+      })();
+    }
   }
 
   return NextResponse.json({ ok: true });

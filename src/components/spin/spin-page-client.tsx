@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { History, Gift, Clock, Coins, Sparkles } from "lucide-react";
 import { PrizeWheel } from "@/components/spin/prize-wheel";
 import { SpinHistory } from "@/components/spin/spin-history";
+import { StreakCalendarCard } from "@/components/spin/streak-calendar-card";
 import { SITE_NAME } from "@/lib/constants";
 import { WalletCardLoader } from "@/components/wallet/wallet-card-loader";
 import Link from "next/link";
@@ -67,7 +68,10 @@ export function SpinPageClient({
       <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-indigo-900/20 rounded-full blur-[140px]" />
       <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-amber-600/5 rounded-full blur-[100px]" />
 
-      <div className="relative mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 lg:py-12 space-y-8">
+        {/* 7-Day Consecutive Streak + VIP Loot Box Card */}
+        <StreakCalendarCard />
+
         <div className="grid lg:grid-cols-[minmax(220px,280px)_1fr_minmax(220px,280px)] gap-8 lg:gap-10 items-start">
           {/* Left panel */}
           <div className="space-y-6 order-2 lg:order-1">

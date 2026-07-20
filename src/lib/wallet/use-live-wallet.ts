@@ -46,14 +46,18 @@ export function useLiveWallet(initial?: WalletBalance | null) {
     if (!supabase) return;
 
     let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let channelInstance: ReturnType<typeof supabase.channel> | null = null;
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      const uid = session?.user?.id;
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      const uid = user?.id;
       if (!uid || cancelled) return;
 
-      channel = supabase
-        .channel(`wallet-live-${uid}`)
+      const channelName = `wallet-live-${uid}-${Date.now()}`;
+
+      // Build channel with all .on() handlers BEFORE calling .subscribe()
+      channelInstance = supabase.channel(channelName);
+
+      channelInstance
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${uid}` },
@@ -88,7 +92,9 @@ export function useLiveWallet(initial?: WalletBalance | null) {
 
     return () => {
       cancelled = true;
-      if (channel) supabase.removeChannel(channel);
+      if (channelInstance) {
+        supabase.removeChannel(channelInstance);
+      }
     };
   }, [refresh]);
 

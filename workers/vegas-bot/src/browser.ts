@@ -1,5 +1,6 @@
 import { chromium, type Page } from "playwright";
 import { join } from "path";
+import { findPanelTab } from "../../shared/find-panel-tab.js";
 
 export interface BrowserSession {
   page: Page;
@@ -26,38 +27,13 @@ function launchOptions() {
   };
 }
 
-/** Pick the panel tab, not about:blank or VPN extension tabs */
 async function findPanelPage(pages: Page[]): Promise<Page> {
-  for (const page of pages) {
-    const url = page.url();
-    if (url.includes(PANEL_HOST) && !url.includes("about:")) {
-      console.log("[vegas] Using tab:", url);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  for (const page of pages) {
-    const title = await page.title().catch(() => "");
-    if (/backend|management|sweep/i.test(title)) {
-      console.log("[vegas] Using tab by title:", title);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  const fallback = pages.find(
-    (p) => !p.url().includes("about:blank") && !p.url().startsWith("chrome-extension:")
-  );
-  if (fallback) {
-    console.log("[vegas] Using first non-blank tab:", fallback.url());
-    await fallback.bringToFront();
-    return fallback;
-  }
-
-  throw new Error(
-    "No Vegas Sweeps tab found in Chrome. Open the agent panel (agent.lasvegassweeps.com) in the bot Chrome, then retry."
-  );
+  return findPanelTab(pages, {
+    host: PANEL_HOST,
+    logPrefix: "[vegas]",
+    panelName: "Vegas Sweeps",
+    panelUrlHint: "https://agent.lasvegassweeps.com/login",
+  });
 }
 
 export async function openBrowserSession(): Promise<BrowserSession> {

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
+import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { LeaderboardTable } from "@/components/shared/leaderboard-table";
 import { Button } from "@/components/ui/button";
@@ -31,9 +30,8 @@ export default async function PublicLeaderboardPage({
   const view = await getLeaderboard(period, 50);
 
   return (
-    <>
-      <Navbar />
-      <main className="pt-24 pb-16">
+    <VipPageLayout>
+      <main className="pb-16">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ name: "Home", href: "/" }, { name: "Leaderboard" }]} />
 
@@ -67,7 +65,6 @@ export default async function PublicLeaderboardPage({
           <LeaderboardTable rows={view.rows} highlightUserId={undefined} />
         </div>
       </main>
-      <Footer />
-    </>
+    </VipPageLayout>
   );
 }

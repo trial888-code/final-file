@@ -1,7 +1,7 @@
 export interface CityData {
   name: string;
   slug: string;
-  descriptionSnippet: string; // used in meta descriptions
+  descriptionSnippet: string;
 }
 
 export interface StateData {
@@ -16,112 +16,150 @@ export interface StateData {
 
 export const GEO_STATES: Record<string, StateData> = {
   texas: {
-    name: "Texas",
-    abbr: "TX",
-    slug: "texas",
-    heroImageUrl: "https://images.pexels.com/photos/20185085/pexels-photo-20185085.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora is available to players across Texas — from Houston and Dallas to San Antonio and Austin. Play Fire Kirin, Juwa, Orion Stars, Game Vault and 8 more sweepstakes fish table games online. 50% welcome bonus on every title.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars, Game Vault and 8 more sweepstakes fish table games online in Texas. 50% welcome bonus. CashApp, Zelle & Crypto deposits. Instant accounts for players in Houston, Dallas, San Antonio, Austin and across TX.",
+    name: "Texas", abbr: "TX", slug: "texas",
+    heroLede: "Spinora is available to players across Texas — Houston, Dallas, San Antonio, Austin, Fort Worth, El Paso and more.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars, Game Vault and sweepstakes fish table games online in Texas. 50% welcome bonus.",
     cities: [
       { name: "Houston", slug: "houston", descriptionSnippet: "Houston's most popular sweepstakes fish table platform" },
       { name: "Dallas", slug: "dallas", descriptionSnippet: "Dallas players enjoy Fire Kirin, Juwa and 10 more games" },
       { name: "San Antonio", slug: "san-antonio", descriptionSnippet: "San Antonio sweepstakes gaming — account ready instantly" },
       { name: "Austin", slug: "austin", descriptionSnippet: "Austin players can access all 12 Spinora games" },
-      { name: "Fort Worth", slug: "fort-worth", descriptionSnippet: "Fort Worth online fish table games with 50% welcome bonus" },
+      { name: "Fort Worth", slug: "fort-worth", descriptionSnippet: "Fort Worth online fish table games" },
+      { name: "El Paso", slug: "el-paso", descriptionSnippet: "El Paso online sweepstakes games" },
+      { name: "Arlington", slug: "arlington", descriptionSnippet: "Arlington TX sweepstakes slots" },
+      { name: "Corpus Christi", slug: "corpus-christi", descriptionSnippet: "Corpus Christi TX fish tables" },
     ],
   },
   florida: {
-    name: "Florida",
-    abbr: "FL",
-    slug: "florida",
-    heroImageUrl: "https://images.pexels.com/photos/30147234/pexels-photo-30147234.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora serves players across Florida — Miami, Orlando, Jacksonville, Tampa and beyond. Access all 12 fish table & sweepstakes games with a 50% welcome bonus. Instant accounts and wallet-funded credits.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and 9 more sweepstakes fish table games online in Florida. 50% welcome bonus. CashApp, Zelle & Crypto. Instant accounts for players in Miami, Orlando, Jacksonville, Tampa and across FL.",
+    name: "Florida", abbr: "FL", slug: "florida",
+    heroLede: "Spinora serves players across Florida — Miami, Orlando, Jacksonville, Tampa, Fort Lauderdale, St Petersburg and beyond.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Florida. 50% welcome bonus.",
     cities: [
       { name: "Miami", slug: "miami", descriptionSnippet: "Miami players get 50% bonus on their first deposit" },
       { name: "Orlando", slug: "orlando", descriptionSnippet: "Orlando sweepstakes games — Fire Kirin, Juwa and more" },
       { name: "Jacksonville", slug: "jacksonville", descriptionSnippet: "Jacksonville fish table games available 7 days a week" },
       { name: "Tampa", slug: "tampa", descriptionSnippet: "Tampa online fish tables with fast Telegram support" },
-    ],
-  },
-  georgia: {
-    name: "Georgia",
-    abbr: "GA",
-    slug: "georgia",
-    heroImageUrl: "https://images.pexels.com/photos/33133726/pexels-photo-33133726.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora is available to players across Georgia including Atlanta, Augusta, Savannah and Columbus. Play 12 premium sweepstakes fish table and slot games online. 50% welcome bonus, instant account setup.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and more sweepstakes fish table games online in Georgia. 50% welcome bonus for players in Atlanta, Augusta, Savannah and across GA. Instant account setup.",
-    cities: [
-      { name: "Atlanta", slug: "atlanta", descriptionSnippet: "Atlanta's #1 sweepstakes fish table gaming platform" },
-      { name: "Augusta", slug: "augusta", descriptionSnippet: "Augusta players access Fire Kirin, Juwa and 10 more games" },
-      { name: "Savannah", slug: "savannah", descriptionSnippet: "Savannah online sweepstakes gaming — 50% welcome bonus" },
-      { name: "Columbus", slug: "columbus-ga", descriptionSnippet: "Columbus GA sweepstakes games with fast account setup" },
+      { name: "Fort Lauderdale", slug: "fort-lauderdale", descriptionSnippet: "Fort Lauderdale online games" },
+      { name: "Tallahassee", slug: "tallahassee", descriptionSnippet: "Tallahassee FL sweepstakes slots" },
     ],
   },
   california: {
-    name: "California",
-    abbr: "CA",
-    slug: "california",
-    heroImageUrl: "https://images.pexels.com/photos/29536601/pexels-photo-29536601.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora serves players across California — Los Angeles, San Diego, Sacramento, Fresno and beyond. All 12 sweepstakes fish table games available online with a 50% first deposit welcome bonus.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and 9 more sweepstakes games online in California. 50% welcome bonus. CashApp, Zelle & Crypto deposits. Instant accounts for players in Los Angeles, San Diego, Sacramento and across CA.",
+    name: "California", abbr: "CA", slug: "california",
+    heroLede: "Spinora serves players across California — Los Angeles, San Diego, San Francisco, Sacramento, San Jose, Fresno.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in California. 50% welcome bonus.",
     cities: [
       { name: "Los Angeles", slug: "los-angeles", descriptionSnippet: "LA players get Fire Kirin, Juwa and 10 more games online" },
       { name: "San Diego", slug: "san-diego", descriptionSnippet: "San Diego sweepstakes gaming with 50% welcome bonus" },
-      { name: "Sacramento", slug: "sacramento", descriptionSnippet: "Sacramento online fish table games — account ready instantly" },
+      { name: "San Francisco", slug: "san-francisco", descriptionSnippet: "San Francisco online fish table games" },
+      { name: "Sacramento", slug: "sacramento", descriptionSnippet: "Sacramento online fish table games" },
+      { name: "San Jose", slug: "san-jose", descriptionSnippet: "San Jose sweepstakes games" },
       { name: "Fresno", slug: "fresno", descriptionSnippet: "Fresno players access all 12 Spinora sweepstakes games" },
     ],
   },
+  georgia: {
+    name: "Georgia", abbr: "GA", slug: "georgia",
+    heroLede: "Spinora is available to players across Georgia including Atlanta, Augusta, Savannah, Columbus, Macon, Athens.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Georgia. 50% welcome bonus.",
+    cities: [
+      { name: "Atlanta", slug: "atlanta", descriptionSnippet: "Atlanta's #1 sweepstakes fish table gaming platform" },
+      { name: "Augusta", slug: "augusta", descriptionSnippet: "Augusta players access Fire Kirin, Juwa and 10 more games" },
+      { name: "Savannah", slug: "savannah", descriptionSnippet: "Savannah online sweepstakes gaming" },
+      { name: "Columbus", slug: "columbus-ga", descriptionSnippet: "Columbus GA sweepstakes games" },
+      { name: "Macon", slug: "macon", descriptionSnippet: "Macon GA online slots" },
+      { name: "Athens", slug: "athens-ga", descriptionSnippet: "Athens GA fish tables" },
+    ],
+  },
   "north-carolina": {
-    name: "North Carolina",
-    abbr: "NC",
-    slug: "north-carolina",
-    heroImageUrl: "https://images.pexels.com/photos/18931263/pexels-photo-18931263.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora is available to players across North Carolina including Charlotte, Raleigh and Greensboro. Play Fire Kirin, Juwa, Orion Stars and 9 more sweepstakes games online with a 50% welcome bonus.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and sweepstakes fish table games online in North Carolina. 50% welcome bonus for players in Charlotte, Raleigh, Greensboro and across NC. Instant account setup.",
+    name: "North Carolina", abbr: "NC", slug: "north-carolina",
+    heroLede: "Spinora is available to players across North Carolina including Charlotte, Raleigh, Greensboro, Durham, Fayetteville.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in North Carolina.",
     cities: [
       { name: "Charlotte", slug: "charlotte", descriptionSnippet: "Charlotte's leading online sweepstakes fish table platform" },
       { name: "Raleigh", slug: "raleigh", descriptionSnippet: "Raleigh players enjoy Fire Kirin, Juwa and 10 more games" },
-      { name: "Greensboro", slug: "greensboro", descriptionSnippet: "Greensboro online sweepstakes gaming — 50% welcome bonus" },
+      { name: "Greensboro", slug: "greensboro", descriptionSnippet: "Greensboro online sweepstakes gaming" },
+      { name: "Durham", slug: "durham", descriptionSnippet: "Durham NC slots" },
+      { name: "Fayetteville", slug: "fayetteville-nc", descriptionSnippet: "Fayetteville NC fish tables" },
     ],
   },
   ohio: {
-    name: "Ohio",
-    abbr: "OH",
-    slug: "ohio",
-    heroImageUrl: "https://images.pexels.com/photos/18353982/pexels-photo-18353982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora serves players across Ohio — Columbus, Cleveland, Cincinnati and beyond. All 12 sweepstakes fish table and slot games available online. 50% welcome bonus and instant account setup.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Ohio. 50% welcome bonus for players in Columbus, Cleveland, Cincinnati and across OH. CashApp, Zelle & Crypto deposits.",
+    name: "Ohio", abbr: "OH", slug: "ohio",
+    heroLede: "Spinora serves players across Ohio — Columbus, Cleveland, Cincinnati, Toledo, Akron, Dayton.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars and sweepstakes games online in Ohio.",
     cities: [
-      { name: "Columbus", slug: "columbus-oh", descriptionSnippet: "Columbus OH sweepstakes gaming with 50% welcome bonus" },
-      { name: "Cleveland", slug: "cleveland", descriptionSnippet: "Cleveland online fish table games — Fire Kirin, Juwa and more" },
+      { name: "Columbus", slug: "columbus-oh", descriptionSnippet: "Columbus OH sweepstakes gaming" },
+      { name: "Cleveland", slug: "cleveland", descriptionSnippet: "Cleveland online fish table games" },
       { name: "Cincinnati", slug: "cincinnati", descriptionSnippet: "Cincinnati players access all 12 Spinora games online" },
+      { name: "Toledo", slug: "toledo", descriptionSnippet: "Toledo OH sweepstakes" },
+      { name: "Akron", slug: "akron", descriptionSnippet: "Akron OH slots" },
+      { name: "Dayton", slug: "dayton", descriptionSnippet: "Dayton OH games" },
+    ],
+  },
+  "new-york": {
+    name: "New York", abbr: "NY", slug: "new-york",
+    heroLede: "Play online sweepstakes slots & fish tables across New York — NYC, Buffalo, Rochester, Syracuse, Albany.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars in New York. 50% welcome bonus.",
+    cities: [
+      { name: "New York City", slug: "nyc", descriptionSnippet: "NYC online sweepstakes casino" },
+      { name: "Buffalo", slug: "buffalo", descriptionSnippet: "Buffalo NY slots" },
+      { name: "Rochester", slug: "rochester", descriptionSnippet: "Rochester NY fish tables" },
+      { name: "Syracuse", slug: "syracuse", descriptionSnippet: "Syracuse NY sweepstakes" },
+      { name: "Albany", slug: "albany", descriptionSnippet: "Albany NY games" },
+    ],
+  },
+  illinois: {
+    name: "Illinois", abbr: "IL", slug: "illinois",
+    heroLede: "Illinois premier sweepstakes slots & fish tables online — Chicago, Aurora, Naperville, Rockford, Joliet.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars in Illinois. 50% welcome bonus.",
+    cities: [
+      { name: "Chicago", slug: "chicago", descriptionSnippet: "Chicago online fish tables & slots" },
+      { name: "Aurora", slug: "aurora", descriptionSnippet: "Aurora IL games" },
+      { name: "Naperville", slug: "naperville", descriptionSnippet: "Naperville IL slots" },
+      { name: "Rockford", slug: "rockford", descriptionSnippet: "Rockford IL sweepstakes" },
+      { name: "Joliet", slug: "joliet", descriptionSnippet: "Joliet IL fish tables" },
+    ],
+  },
+  pennsylvania: {
+    name: "Pennsylvania", abbr: "PA", slug: "pennsylvania",
+    heroLede: "Pennsylvania online sweepstakes casino — Philadelphia, Pittsburgh, Allentown, Erie, Reading.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars in Pennsylvania. 50% welcome bonus.",
+    cities: [
+      { name: "Philadelphia", slug: "philadelphia", descriptionSnippet: "Philly online fish table games" },
+      { name: "Pittsburgh", slug: "pittsburgh", descriptionSnippet: "Pittsburgh PA slots" },
+      { name: "Allentown", slug: "allentown", descriptionSnippet: "Allentown PA games" },
+      { name: "Erie", slug: "erie", descriptionSnippet: "Erie PA sweepstakes" },
     ],
   },
   michigan: {
-    name: "Michigan",
-    abbr: "MI",
-    slug: "michigan",
-    heroImageUrl: "https://images.pexels.com/photos/12950494/pexels-photo-12950494.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    heroLede:
-      "Spinora is available to players across Michigan — Detroit, Grand Rapids and beyond. Play all 12 sweepstakes fish table and slot games online. 50% welcome bonus applied automatically to every new account.",
-    metaDescription:
-      "Play Fire Kirin, Juwa, Orion Stars and 9 more sweepstakes games online in Michigan. 50% welcome bonus for players in Detroit, Grand Rapids and across MI. Instant account setup.",
+    name: "Michigan", abbr: "MI", slug: "michigan",
+    heroLede: "Michigan online sweepstakes games — Detroit, Grand Rapids, Warren, Sterling Heights, Lansing.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars in Michigan. 50% welcome bonus.",
     cities: [
-      { name: "Detroit", slug: "detroit", descriptionSnippet: "Detroit's top online sweepstakes fish table gaming platform" },
-      { name: "Grand Rapids", slug: "grand-rapids", descriptionSnippet: "Grand Rapids players enjoy Fire Kirin, Juwa and 10 more games" },
+      { name: "Detroit", slug: "detroit", descriptionSnippet: "Detroit MI online fish tables" },
+      { name: "Grand Rapids", slug: "grand-rapids", descriptionSnippet: "Grand Rapids MI slots" },
+      { name: "Warren", slug: "warren", descriptionSnippet: "Warren MI sweepstakes" },
+      { name: "Lansing", slug: "lansing", descriptionSnippet: "Lansing MI games" },
+    ],
+  },
+  nevada: {
+    name: "Nevada", abbr: "NV", slug: "nevada",
+    heroLede: "Vegas-style online sweepstakes slots & fish tables — Las Vegas, Reno, Henderson, Sparks.",
+    metaDescription: "Play Vegas Sweeps, Fire Kirin, Juwa in Nevada. 50% welcome bonus.",
+    cities: [
+      { name: "Las Vegas", slug: "las-vegas", descriptionSnippet: "Vegas online slots & fish table jackpots" },
+      { name: "Reno", slug: "reno", descriptionSnippet: "Reno NV sweepstakes games" },
+      { name: "Henderson", slug: "henderson", descriptionSnippet: "Henderson NV slots" },
+      { name: "Sparks", slug: "sparks", descriptionSnippet: "Sparks NV games" },
+    ],
+  },
+  arizona: {
+    name: "Arizona", abbr: "AZ", slug: "arizona",
+    heroLede: "Arizona online fish table games & slots — Phoenix, Tucson, Mesa, Chandler, Scottsdale.",
+    metaDescription: "Play Fire Kirin, Juwa, Orion Stars in Arizona. 50% welcome bonus.",
+    cities: [
+      { name: "Phoenix", slug: "phoenix", descriptionSnippet: "Phoenix AZ online fish tables" },
+      { name: "Tucson", slug: "tucson", descriptionSnippet: "Tucson AZ sweepstakes" },
+      { name: "Mesa", slug: "mesa", descriptionSnippet: "Mesa AZ slots" },
+      { name: "Scottsdale", slug: "scottsdale", descriptionSnippet: "Scottsdale AZ games" },
     ],
   },
 } as const;

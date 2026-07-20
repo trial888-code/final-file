@@ -26,17 +26,19 @@ export function useDashboardSession() {
 
     let cancelled = false;
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getUser().then(({ data: { user } }) => {
       if (!cancelled) {
-        setUserId(session?.user?.id ?? null);
+        setUserId(user?.id ?? null);
         setReady(true);
       }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setUserId(null);
+      }
     });
 
     return () => {

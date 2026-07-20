@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Copy,
   Eye,
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   Pencil,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -60,6 +62,8 @@ export function GameWalletLoadSection({
   const supabase = useMemo(() => createClient(), []);
 
   const [walletBalance, setWalletBalance] = useState(0);
+  const [cashoutWallet, setCashoutWallet] = useState(0);
+  const [kycStatus, setKycStatus] = useState<string>("unverified");
   const [amount, setAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAmount, setRedeemAmount] = useState(String(WALLET_LOAD_LIMITS.min));
   const [redeemAll, setRedeemAll] = useState(false);
@@ -104,12 +108,14 @@ export function GameWalletLoadSection({
 
     const { data } = await supabase
       .from("profiles")
-      .select("wallet_balance, full_name, email")
+      .select("wallet_balance, cashout_wallet, kyc_status, full_name, email")
       .eq("id", user.id)
       .single();
 
     if (data) {
       setWalletBalance(Number(data.wallet_balance ?? 0));
+      setCashoutWallet(Number(data.cashout_wallet ?? 0));
+      setKycStatus(String(data.kyc_status ?? "unverified"));
       setRequesterName(data.full_name ?? null);
       setRequesterEmail(data.email ?? null);
     }
@@ -142,9 +148,15 @@ export function GameWalletLoadSection({
         (l.status === "completed" || l.status === "failed" || l.status === "cancelled") &&
         pendingLoadIdsRef.current.has(l.id)
     );
+    const finishedRedeem = loads.some(
+      (l) =>
+        l.load_type === "redeem" &&
+        (l.status === "completed" || l.status === "failed" || l.status === "cancelled") &&
+        pendingJobIdsRef.current.has(l.id)
+    );
     pendingLoadIdsRef.current = pendingIds;
 
-    if (finishedLoad || (hadPending && pendingIds.size === 0)) {
+    if (finishedLoad || finishedRedeem || (hadPending && pendingIds.size === 0)) {
       void refreshWallet();
     }
 
@@ -159,9 +171,6 @@ export function GameWalletLoadSection({
       if (load.status === "pending" || load.status === "processing") {
         pendingJobIdsRef.current.add(load.id);
       }
-      if (load.status === "completed" || load.status === "cancelled") {
-        pendingJobIdsRef.current.delete(load.id);
-      }
     }
 
     const justFailed = loads.find(
@@ -174,7 +183,36 @@ export function GameWalletLoadSection({
       failedToastShownRef.current.add(justFailed.id);
       pendingJobIdsRef.current.delete(justFailed.id);
       failedToastRef.current = justFailed.id;
+      toast.error(justFailed.error_message ?? "Request failed");
       void refreshWallet();
+    }
+
+    const justCompleted = loads.find(
+      (load) =>
+        load.status === "completed" &&
+        pendingJobIdsRef.current.has(load.id)
+    );
+    if (justCompleted) {
+      pendingJobIdsRef.current.delete(justCompleted.id);
+      if (justCompleted.load_type === "check_balance") {
+        toast.success(`Balance: $${Number(justCompleted.amount).toFixed(2)}`);
+      } else if (justCompleted.load_type === "load" || justCompleted.load_type === "reload") {
+        toast.success(`$${Number(justCompleted.amount).toFixed(2)} loaded to ${game.name}`);
+      } else if (justCompleted.load_type === "redeem") {
+        toast.success(
+          `$${Number(justCompleted.amount).toFixed(2)} redeemed to your Deposit Redeem wallet`
+        );
+        void refreshWallet();
+      } else if (isGameAccountCreateLoadType(justCompleted.load_type) && justCompleted.game_username) {
+        toast.success(`${game.name} account ready: ${justCompleted.game_username}`);
+        void refreshAccount();
+      }
+    }
+
+    for (const load of loads) {
+      if (load.status === "cancelled") {
+        pendingJobIdsRef.current.delete(load.id);
+      }
     }
 
     const completedCreate = loads.find(
@@ -191,7 +229,7 @@ export function GameWalletLoadSection({
     }
 
     return loads;
-  }, [game.slug, refreshWallet]);
+  }, [game.slug, refreshWallet, refreshAccount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,7 +237,7 @@ export function GameWalletLoadSection({
     async function init() {
       void refreshWallet();
       await refreshAccount();
-      await healStaleGameLoads(game.slug, 5);
+      await healStaleGameLoads(game.slug, 20);
       await refreshLoads();
       if (cancelled) return;
       accountReadyRef.current = true;
@@ -235,6 +273,38 @@ export function GameWalletLoadSection({
     return () => window.removeEventListener(WALLET_REFRESH_EVENT, onWalletRefresh);
   }, [refreshWallet]);
 
+  useEffect(() => {
+    if (!supabase) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || cancelled) return;
+      channel = supabase
+        .channel(`game-wallet-profile-${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
+          (payload) => {
+            const row = payload.new as Record<string, unknown>;
+            setWalletBalance(Number(row.wallet_balance ?? 0));
+            setCashoutWallet(Number(row.cashout_wallet ?? 0));
+            setKycStatus(String(row.kyc_status ?? "unverified"));
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (fundsTab === "redeem") void refreshWallet();
+  }, [fundsTab, refreshWallet]);
+
   const pendingCreate = recentLoads.some(
     (l) =>
       isGameAccountCreateLoadType(l.load_type) &&
@@ -256,19 +326,19 @@ export function GameWalletLoadSection({
   useEffect(() => {
     if (!anyPending) return;
 
-    void healStaleGameLoads(game.slug, 5).then((result) => {
+    void healStaleGameLoads(game.slug, 20).then((result) => {
       if (result.healed > 0) void refreshLoads();
     });
 
     void refreshLoads();
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void healStaleGameLoads(game.slug, 5).then((result) => {
+        void healStaleGameLoads(game.slug, 20).then((result) => {
           if (result.healed > 0) void refreshLoads();
         });
         void refreshLoads();
       }
-    }, 3000);
+    }, 1500);
 
     return () => clearInterval(interval);
   }, [anyPending, refreshLoads, game.slug]);
@@ -315,6 +385,7 @@ export function GameWalletLoadSection({
   const redeemRulesActive =
     activeRedeemRollover !== null && activeRedeemRollover.activeDepositAmount > 0;
   const canRedeem = redeemRulesActive;
+  const kycVerified = kycStatus === "verified";
 
   const redeemMaxAllowed = redeemRulesActive
     ? Math.min(WALLET_LOAD_LIMITS.max, activeRedeemRollover!.maxRedeemRemaining)
@@ -379,6 +450,7 @@ export function GameWalletLoadSection({
     if (result.error) {
       toast.error(result.error);
     } else {
+      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
         hasSavedAccount
           ? `Replacing your ${game.name} account…`
@@ -420,7 +492,10 @@ export function GameWalletLoadSection({
       gameUsername: savedAccount.game_username,
     });
     if (result.error) toast.error(result.error);
-    else toast.success("Checking your live game balance…");
+    else {
+      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
+      toast.success("Checking your live game balance…");
+    }
     void refreshLoads();
     setCheckingBalance(false);
   }
@@ -450,6 +525,7 @@ export function GameWalletLoadSection({
 
     if (result.error) toast.error(result.error);
     else {
+      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(`Load queued! $${parsedAmount.toFixed(2)} — bot will credit ${game.name} shortly.`);
       void refreshWallet();
       void refreshLoads();
@@ -508,6 +584,7 @@ export function GameWalletLoadSection({
     const destLabel = "Deposit Redeem";
     if (result.error) toast.error(result.error);
     else {
+      if (result.requestId) pendingJobIdsRef.current.add(result.requestId);
       toast.success(
         redeemAll
           ? `Redeem queued — bot will cash out your full game balance to your ${destLabel} wallet.`
@@ -607,7 +684,7 @@ export function GameWalletLoadSection({
             <button
               type="button"
               onClick={handleCheckBalance}
-              disabled={checkingBalance || pendingCheck}
+              disabled={checkingBalance || pendingCheck || pendingCreate || !savedAccount?.game_username}
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50"
             >
               {checkingBalance || pendingCheck ? (
@@ -831,10 +908,17 @@ export function GameWalletLoadSection({
         </div>
 
         <div className="rounded-xl border border-white/10 bg-[#242424]/80 px-4 py-3.5 sm:px-5 sm:py-4">
-          <span className="text-xs sm:text-sm text-muted-foreground">Total Deposit</span>
+          <span className="text-xs sm:text-sm text-muted-foreground">
+            {fundsTab === "redeem" ? "Deposit Redeem (cashout wallet)" : "Total Deposit"}
+          </span>
           <p className="mt-1 text-xl sm:text-2xl font-bold text-white tabular-nums">
-            ${walletBalance.toFixed(2)}
+            ${(fundsTab === "redeem" ? cashoutWallet : walletBalance).toFixed(2)}
           </p>
+          {fundsTab === "redeem" && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Total Deposit stays ${walletBalance.toFixed(2)} — redeem adds to Deposit Redeem, not Total Deposit.
+            </p>
+          )}
         </div>
 
         {fundsTab === "load" ? (
@@ -885,10 +969,29 @@ export function GameWalletLoadSection({
               Redeem Credits
             </p>
             <p className="text-sm text-muted-foreground">
-              Pull credits from your {game.name} account to your Deposit Redeem wallet.
+              Pull credits from your {game.name} account to your Deposit Redeem wallet. Verified KYC required.
             </p>
 
-            {!canRedeem && savedAccount && (
+            {!kycVerified && savedAccount && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-xs text-amber-100/95 space-y-2">
+                <p className="font-semibold text-amber-200 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4" />
+                  {kycStatus === "pending"
+                    ? "KYC under review — redeem unlocks after admin approval"
+                    : "KYC verification required to redeem"}
+                </p>
+                {kycStatus !== "pending" && (
+                  <Link
+                    href="/dashboard/kyc"
+                    className="inline-flex items-center gap-1 text-amber-300 underline font-semibold hover:text-amber-200"
+                  >
+                    Complete KYC verification →
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {!canRedeem && savedAccount && kycVerified && (
               <p className="text-xs text-amber-400/90">
                 Load credits from Total Deposit into this game first, then redeem at {redeemMinMult}x–{redeemMaxMult}x.
               </p>
@@ -960,6 +1063,7 @@ export function GameWalletLoadSection({
                     redeeming ||
                     pendingRedeem ||
                     !savedAccount ||
+                    !kycVerified ||
                     !canRedeem ||
                     redeemBlocked ||
                     (redeemRulesActive && activeRedeemRollover!.maxRedeemRemaining <= 0)
@@ -984,6 +1088,7 @@ export function GameWalletLoadSection({
                   redeeming ||
                   pendingRedeem ||
                   !savedAccount ||
+                  !kycVerified ||
                   !canRedeem ||
                   redeemBlocked ||
                   (redeemRulesActive && activeRedeemRollover!.maxRedeemRemaining <= 0)

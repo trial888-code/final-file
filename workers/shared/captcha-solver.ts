@@ -27,8 +27,8 @@ export function captchaSolverProvider(): CaptchaSolverProvider {
 }
 
 function maxRetries(): number {
-  const n = Number(env("CAPTCHA_MAX_RETRIES") ?? 3);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 3;
+  const n = Number(env("CAPTCHA_MAX_RETRIES") ?? 5);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
 }
 
 function pollMs(): number {
@@ -83,10 +83,10 @@ async function solveWithLocalOcr(image: Buffer): Promise<string | null> {
   const worker = await getOcrWorker();
   const { data } = await worker.recognize(image);
   const text = normalizeCaptchaText(data.text);
-  const confidence = data.confidence ?? 0;
 
+  if (!text || text.length < 3) return null;
+  if (data.confidence < ocrMinConfidence()) return null;
   if (!looksLikeCaptcha(text)) return null;
-  if (confidence < ocrMinConfidence()) return null;
   return text;
 }
 

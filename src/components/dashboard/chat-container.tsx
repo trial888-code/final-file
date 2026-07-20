@@ -131,9 +131,9 @@ export function ChatContainer({
       return null;
     }
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
+      data: { user },
+    } = await supabase.auth.getUser();
+    const uid = user?.id;
     if (!uid) {
       toast.error("Not signed in.");
       return null;

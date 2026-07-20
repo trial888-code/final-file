@@ -9,9 +9,12 @@ echo ============================================================
 echo   ALL BOTS — SINGLE CHROME (each bot uses its own tab)
 echo ============================================================
 echo   Requires start-unified-chrome.bat first.
-echo   Bots auto-login each tab on startup (CAPTCHA OCR) + every 5 min.
+echo   CAPTCHA + Supabase keys come from each bot .env
+echo   (run sync-bot-env.bat if you changed workers\.env)
 echo ============================================================
 echo.
+
+node sync-bot-env.mjs >nul 2>&1
 
 curl.exe -s -o nul -w "%%{http_code}" %CDP%/json/version 2>nul | findstr /r "^200$" >nul
 if errorlevel 1 (

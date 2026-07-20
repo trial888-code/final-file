@@ -1,5 +1,6 @@
 import { chromium, type Page } from "playwright";
 import { join } from "path";
+import { findPanelTab } from "../../shared/find-panel-tab.js";
 
 export interface BrowserSession {
   page: Page;
@@ -26,59 +27,14 @@ function launchOptions() {
   };
 }
 
-/** Prefer /admin dashboard (manual workflow); also accept standalone player/index tab. */
+/** Prefer /admin dashboard; host-only match (no cross-game tab stealing). */
 async function findPanelPage(pages: Page[]): Promise<Page> {
-  const dashboard = pages.find((p) => {
-    const url = p.url();
-    return (
-      url.includes(PANEL_HOST) &&
-      !url.includes("about:") &&
-      (/\/admin\/?$/i.test(url) || (url.includes("/admin") && !url.includes("/player/") && !url.includes("/login")))
-    );
+  return findPanelTab(pages, {
+    host: PANEL_HOST,
+    logPrefix: "[gr]",
+    panelName: "Gameroom",
+    panelUrlHint: "https://agentserver1.gameroom777.com/admin",
   });
-  if (dashboard) {
-    console.log("[gr] Using tab:", dashboard.url());
-    await dashboard.bringToFront();
-    return dashboard;
-  }
-
-  const playerList = pages.find((p) => /player\/index/i.test(p.url()));
-  if (playerList) {
-    console.log("[gr] Using tab:", playerList.url());
-    await playerList.bringToFront();
-    return playerList;
-  }
-
-  for (const page of pages) {
-    const url = page.url();
-    if (url.includes(PANEL_HOST) && !url.includes("about:")) {
-      console.log("[gr] Using tab:", url);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  for (const page of pages) {
-    const title = await page.title().catch(() => "");
-    if (/backend|management|gameroom/i.test(title)) {
-      console.log("[gr] Using tab by title:", title);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  const fallback = pages.find(
-    (p) => !p.url().includes("about:blank") && !p.url().startsWith("chrome-extension:")
-  );
-  if (fallback) {
-    console.log("[gr] Using first non-blank tab:", fallback.url());
-    await fallback.bringToFront();
-    return fallback;
-  }
-
-  throw new Error(
-    "No Gameroom tab found in Chrome. Open the agent panel (agentserver1.gameroom777.com) in the bot Chrome, then retry."
-  );
 }
 
 export async function openBrowserSession(): Promise<BrowserSession> {

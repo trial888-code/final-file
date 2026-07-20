@@ -7,6 +7,9 @@ import { MessageRealtimeProvider } from "@/components/chat/message-realtime-prov
 import { createClient } from "@/lib/supabase/client";
 import { MessageRealtimeStubProvider } from "@/lib/chat/message-realtime-stub";
 
+import { LiveWinPopup } from "@/components/ui/live-win-popup";
+import { WelcomePromoModal } from "@/components/ui/welcome-promo-modal";
+
 const REALTIME_ROUTE_PREFIXES = ["/dashboard", "/admin", "/spin"];
 
 function needsRealtimeImmediately(pathname: string | null): boolean {
@@ -27,14 +30,18 @@ export function ClientProviders({ children }: { children: ReactNode }) {
       return;
     }
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      setLoggedIn(!!session);
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      setLoggedIn(!!user);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setLoggedIn(!!session);
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        setLoggedIn(true);
+      } else if (event === "SIGNED_OUT") {
+        setLoggedIn(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -49,6 +56,8 @@ export function ClientProviders({ children }: { children: ReactNode }) {
     <>
       <Provider>{children}</Provider>
       <Toaster richColors closeButton position="top-center" />
+      <LiveWinPopup />
+      <WelcomePromoModal />
     </>
   );
 }

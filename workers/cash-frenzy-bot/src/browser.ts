@@ -54,24 +54,6 @@ async function findPanelPage(pages: Page[]): Promise<Page> {
     return page;
   }
 
-  for (const page of pages) {
-    const title = await page.title().catch(() => "");
-    if (/backend|management|frenzy/i.test(title)) {
-      console.log("[cf] Using tab by title:", title);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  const fallback = pages.find(
-    (p) => !p.url().includes("about:blank") && !p.url().startsWith("chrome-extension:")
-  );
-  if (fallback) {
-    console.log("[cf] Using first non-blank tab:", fallback.url());
-    await fallback.bringToFront();
-    return fallback;
-  }
-
   throw new Error(
     "No Cash Frenzy tab found in Chrome. Open the agent panel (agentserver.cashfrenzy777.com) in the bot Chrome, then retry."
   );

@@ -11,8 +11,12 @@ const USER_MGMT_URL = `${BASE_URL}/userManagement`;
 /* ------------------------------------------------------------------ login */
 
 export async function loginToPanel(page: Page): Promise<void> {
-  await page.goto(USER_MGMT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  const alreadyOnPanel =
+    /userManagement/i.test(page.url()) && !(await isLoginPage(page));
+  if (!alreadyOnPanel) {
+    await page.goto(USER_MGMT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  }
 
   if (!(await isLoginPage(page))) {
     log("login", "already authenticated");

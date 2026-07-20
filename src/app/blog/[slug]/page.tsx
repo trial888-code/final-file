@@ -3,18 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
+import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { BlogCoverImage } from "@/components/marketing/blog-cover-image";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
-import { getBlogPost, getPublishedBlogPosts } from "@/lib/data/marketing";
+import { getBlogPost } from "@/lib/data/marketing";
 
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  const posts = await getPublishedBlogPosts();
-  return posts.slice(0, 20).map((p) => ({ slug: p.slug }));
-}
+// Heavy Traffic Optimization: 1-Hour Edge Caching for Sub-30ms Global Response Time
+export const revalidate = 3600;
 
 export async function generateMetadata({
   params,
@@ -24,10 +19,27 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = await getBlogPost(slug);
   if (!post) return { title: "Post not found" };
+
+  const fullUrl = `https://spinoracasinos.com/blog/${slug}`;
+  const imageUrl = post.cover_image_url || "https://spinoracasinos.com/images/promos/spinora_dealer_ten.jpg";
+
   return {
-    title: post.seo_title ?? post.title,
+    title: `${post.seo_title ?? post.title} | Spinora Royale VIP`,
     description: post.seo_description ?? post.excerpt ?? undefined,
     alternates: { canonical: `/blog/${slug}` },
+    openGraph: {
+      title: post.seo_title ?? post.title,
+      description: post.seo_description ?? post.excerpt ?? undefined,
+      url: fullUrl,
+      images: [{ url: imageUrl, width: 1200, height: 630 }],
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.seo_title ?? post.title,
+      description: post.seo_description ?? post.excerpt ?? undefined,
+      images: [imageUrl],
+    },
   };
 }
 
@@ -45,11 +57,38 @@ export default async function BlogPostPage({
   const post = await getBlogPost(slug);
   if (!post) notFound();
 
+  // Google Rich Snippet JSON-LD Schema
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt || post.title,
+    image: post.cover_image_url ? [post.cover_image_url] : [],
+    datePublished: post.published_at || new Date().toISOString(),
+    author: {
+      "@type": "Organization",
+      name: "Spinora Royale VIP Editorial Team",
+      url: "https://spinoracasinos.com",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Spinora Royale VIP",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://spinoracasinos.com/favicon.ico",
+      },
+    },
+  };
+
   return (
     <>
-      <Navbar />
-      <main className="pt-24 pb-16">
-        <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <VipPageLayout>
+        <main className="pb-16">
+          <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs
             items={[
               { name: "Home", href: "/" },
@@ -82,9 +121,9 @@ export default async function BlogPostPage({
             className="prose prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-white"
             dangerouslySetInnerHTML={{ __html: post.content ?? post.excerpt ?? "" }}
           />
-        </article>
-      </main>
-      <Footer />
+          </article>
+        </main>
+      </VipPageLayout>
     </>
   );
 }

@@ -97,12 +97,24 @@ async function findCaptchaImage(page: Page): Promise<Locator | null> {
 }
 
 async function clickLoginButton(page: Page, patterns: RegExp[]): Promise<boolean> {
+  const tryClick = async (loc: Locator): Promise<boolean> => {
+    if ((await loc.count()) === 0 || !(await loc.isVisible().catch(() => false))) return false;
+    try {
+      await loc.click({ timeout: 8000, force: true });
+      return true;
+    } catch {
+      try {
+        await loc.evaluate((el) => (el as HTMLElement).click());
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
   for (const pattern of patterns) {
     const btn = page.getByRole("button", { name: pattern }).first();
-    if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
-      await btn.click({ timeout: 8000 });
-      return true;
-    }
+    if (await tryClick(btn)) return true;
   }
 
   const fallbacks = [
@@ -111,10 +123,7 @@ async function clickLoginButton(page: Page, patterns: RegExp[]): Promise<boolean
     page.locator('button[type="submit"], input[type="submit"]').first(),
   ];
   for (const loc of fallbacks) {
-    if ((await loc.count()) > 0 && (await loc.isVisible().catch(() => false))) {
-      await loc.click({ timeout: 8000 });
-      return true;
-    }
+    if (await tryClick(loc)) return true;
   }
   return false;
 }
@@ -125,6 +134,46 @@ async function refreshCaptchaImage(page: Page, log: PanelLoginLog): Promise<void
   await img.click({ timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(800);
   log("login", "refreshed CAPTCHA image");
+}
+
+/** Game Vault / Element Plus CAPTCHA imgs auto-refresh — element.screenshot() times out on "not stable". */
+async function captureCaptchaPng(page: Page, captchaImg: Locator): Promise<Buffer | null> {
+  const box = await captchaImg.boundingBox().catch(() => null);
+  if (box && box.width >= 40 && box.height >= 15) {
+    const clip = await page
+      .screenshot({ clip: box, type: "png", timeout: 8000 })
+      .catch(() => null);
+    if (clip) return Buffer.from(clip);
+  }
+
+  const src = await captchaImg.getAttribute("src").catch(() => null);
+  if (src) {
+    try {
+      const url = src.startsWith("http") ? src : new URL(src, page.url()).href;
+      const res = await page.request.get(url);
+      if (res.ok()) {
+        const body = await res.body();
+        if (body.length > 100) return Buffer.from(body);
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const el = await captchaImg.screenshot({ type: "png", timeout: 8000 }).catch(() => null);
+  return el ? Buffer.from(el) : null;
+}
+
+/** Stop auto-refreshing CAPTCHA while 2Captcha/OCR runs (Game Vault refreshes every ~1s). */
+async function freezeCaptchaDisplay(captchaImg: Locator, png: Buffer): Promise<void> {
+  const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
+  await captchaImg
+    .evaluate((el, frozen) => {
+      const img = el as HTMLImageElement;
+      img.src = frozen;
+      img.style.pointerEvents = "none";
+    }, dataUrl)
+    .catch(() => {});
 }
 
 async function attemptAutoCaptchaLogin(page: Page, options: PanelLoginOptions): Promise<boolean> {
@@ -143,42 +192,59 @@ async function attemptAutoCaptchaLogin(page: Page, options: PanelLoginOptions): 
     return false;
   }
 
-  const png = await captchaImg.screenshot({ type: "png" }).catch(() => null);
-  if (!png) {
-    log("login", "auto captcha — could not screenshot CAPTCHA image");
-    return false;
-  }
+  const refreshPattern = /\/(api\/agent\/captcha|captcha|vcode|verifycode)/i;
+  let blockCaptchaRefresh = false;
+  await page.route(refreshPattern, async (route) => {
+    if (blockCaptchaRefresh && route.request().resourceType() === "image") {
+      await route.abort();
+      return;
+    }
+    await route.continue();
+  });
 
-  let solution: string;
   try {
-    const result = await solveCaptchaImage(Buffer.from(png));
-    solution = result.text;
-    log("login", `CAPTCHA read (${result.method}, ${solution.length} chars): ${solution}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log("login", `CAPTCHA read failed: ${msg}`);
+    const png = await captureCaptchaPng(page, captchaImg);
+    if (!png) {
+      log("login", "auto captcha — could not capture CAPTCHA image");
+      return false;
+    }
+
+    blockCaptchaRefresh = true;
+    await freezeCaptchaDisplay(captchaImg, png);
+
+    let solution: string;
+    try {
+      const result = await solveCaptchaImage(png);
+      solution = result.text;
+      log("login", `CAPTCHA read (${result.method}, ${solution.length} chars): ${solution}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log("login", `CAPTCHA read failed: ${msg}`);
+      return false;
+    }
+
+    await captchaInput.click().catch(() => {});
+    await captchaInput.fill("");
+    await captchaInput.fill(solution);
+
+    const clicked = await clickLoginButton(page, patterns);
+    if (!clicked) {
+      log("login", "auto captcha — could not find Login button");
+      return false;
+    }
+
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+
+    if (!(await isLoginPage(page))) {
+      return true;
+    }
+
+    log("login", "still on login page after auto CAPTCHA — wrong code or bad credentials");
     return false;
+  } finally {
+    await page.unroute(refreshPattern).catch(() => {});
   }
-
-  await captchaInput.click().catch(() => {});
-  await captchaInput.fill("");
-  await captchaInput.fill(solution);
-
-  const clicked = await clickLoginButton(page, patterns);
-  if (!clicked) {
-    log("login", "auto captcha — could not find Login button");
-    return false;
-  }
-
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
-  await page.waitForTimeout(1500);
-
-  if (!(await isLoginPage(page))) {
-    return true;
-  }
-
-  log("login", "still on login page after auto CAPTCHA — wrong code or bad credentials");
-  return false;
 }
 
 async function waitForManualLoginOnly(page: Page, options: PanelLoginOptions): Promise<void> {

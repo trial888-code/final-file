@@ -28,6 +28,8 @@ const ACCOUNT_LINKS = [
   { href: "/dashboard/games", label: "My Games", icon: Gamepad2 },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/deposit", label: "Deposit", icon: Banknote },
+  { href: "/dashboard/withdraw", label: "Withdraw / Cash Out", icon: Banknote },
+  { href: "/dashboard/kyc", label: "KYC Verification", icon: ShieldCheck },
   { href: "/dashboard/deposits", label: "My Deposits", icon: History },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/vip", label: "VIP Status", icon: Crown },

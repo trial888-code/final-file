@@ -2,11 +2,19 @@
 
 ## Quick start
 
-### Option A — One Chrome, 8 tabs (recommended — one taskbar icon)
+### Option A — One Chrome, 8 tabs (recommended)
 
-1. **`start-unified-chrome.bat`** — one Chrome window, 8 tabs (port 9222)
-2. Log in on each tab (VPN on for Juwa tab)
-3. **`start-all-bots-unified.bat`** — all bots share that Chrome; each uses its own tab
+1. Copy `workers/.env.example` → `workers/.env` and fill Supabase + CAPTCHA keys
+2. **`sync-bot-env.bat`** — copies shared keys into all 8 bot `.env` files
+3. **`set-bot-credentials.bat`** — agent panel username/password for all games
+4. **`smoke-check.bat`** — verify env, deps, Chrome (optional)
+5. **`start-unified-chrome.bat`** — one Chrome window, 8 tabs (port 9222)
+6. Log in on each tab (VPN on for Juwa tab) — or let bots auto-login via 2Captcha
+7. **`start-all-bots-unified.bat`** — all bots share that Chrome
+
+**24/7 auto-restart:** `start-all-advanced-free.bat` (sync → Chrome → watchdog)
+
+**Admin dashboard:** `/admin/bot-status` shows live heartbeats from each bot.
 
 ### Option B — Eight separate Chrome windows (original)
 
@@ -36,10 +44,11 @@ Or run **`start-all.bat`** for the full guided flow (Option B).
 
 ## 24/7 operation
 
-- Leave all Chrome + bot cmd windows open
-- **Power settings:** never sleep when plugged in
-- Sessions may expire — re-login if jobs fail with login errors
-- ~8 Chrome instances use several GB RAM
+- **`start-all-advanced-free.bat`** — syncs env, starts Chrome + watchdog (auto-restarts crashed bots)
+- Leave Chrome + watchdog window open; disable PC sleep when plugged in
+- **`smoke-check.bat`** — run anytime to verify config
+- Sessions auto-refresh every 60s via session keeper; CAPTCHA via OCR + 2Captcha API
+- Monitor live status at **`/admin/bot-status`** (heartbeats every 30s)
 
 ## Per-game manual start
 

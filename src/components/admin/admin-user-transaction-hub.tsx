@@ -163,8 +163,8 @@ export function AdminUserTransactionHub({
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session || cancelled) return;
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || cancelled) return;
 
       channel = supabase
         .channel(`admin-wallet-tx-user-${selectedUserId}`)

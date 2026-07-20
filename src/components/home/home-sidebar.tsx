@@ -121,8 +121,8 @@ export function HomeSidebar({
     import("@/lib/supabase/client").then(({ createClient }) => {
       const supabase = createClient();
       if (!supabase) return;
-      void supabase.auth.getSession().then(({ data: { session } }) => {
-        const loggedIn = !!session?.user;
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        const loggedIn = !!user;
         setIsLoggedIn(loggedIn);
         if (loggedIn) {
           for (const href of PREFETCH_ROUTES) {

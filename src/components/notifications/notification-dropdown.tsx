@@ -58,9 +58,8 @@ export function NotificationDropdown({
     if (!supabase) return;
 
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user ?? null;
+      data: { user },
+    } = await supabase.auth.getUser();
     setIsLoggedIn(!!user);
     setUserId(user?.id ?? null);
     if (!user) return;
@@ -81,9 +80,9 @@ export function NotificationDropdown({
     setMounted(true);
     const supabase = createClient();
     if (!supabase) return;
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session?.user);
-      setUserId(session?.user?.id ?? null);
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsLoggedIn(!!user);
+      setUserId(user?.id ?? null);
     });
   }, []);
 

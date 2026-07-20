@@ -1,5 +1,4 @@
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
+import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { SpinPageClient } from "@/components/spin/spin-page-client";
 import { SpinComingSoon } from "@/components/spin/spin-coming-soon";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -39,8 +38,7 @@ export default async function SpinPage() {
   }
 
   return (
-    <>
-      <Navbar />
+    <VipPageLayout contentClassName="vip-page-content mx-auto max-w-4xl py-4 px-2">
       {DAILY_SPIN_ENABLED ? (
         <SpinPageClient
           isLoggedIn={!!user}
@@ -52,7 +50,6 @@ export default async function SpinPage() {
       ) : (
         <SpinComingSoon />
       )}
-      <Footer fullWidth />
-    </>
+    </VipPageLayout>
   );
 }

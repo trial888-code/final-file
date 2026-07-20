@@ -1,5 +1,6 @@
 import { chromium, type Page } from "playwright";
 import { join } from "path";
+import { findPanelTab } from "../../shared/find-panel-tab.js";
 
 export interface BrowserSession {
   page: Page;
@@ -24,36 +25,13 @@ function launchOptions() {
   };
 }
 
-/** Pick the Juwa admin tab, not about:blank or VPN extension tabs */
 async function findJuwaPage(pages: Page[]): Promise<Page> {
-  for (const page of pages) {
-    const url = page.url();
-    if (url.includes("juwa777.com") && !url.includes("about:")) {
-      console.log("[juwa] Using tab:", url);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  for (const page of pages) {
-    const title = await page.title().catch(() => "");
-    if (/management|juwa/i.test(title)) {
-      console.log("[juwa] Using tab by title:", title);
-      await page.bringToFront();
-      return page;
-    }
-  }
-
-  const fallback = pages.find((p) => !p.url().includes("about:blank") && !p.url().startsWith("chrome-extension:"));
-  if (fallback) {
-    console.log("[juwa] Using first non-blank tab:", fallback.url());
-    await fallback.bringToFront();
-    return fallback;
-  }
-
-  throw new Error(
-    "No Juwa tab found in Chrome. Open User Management (ht.juwa777.com) in the bot Chrome, then retry."
-  );
+  return findPanelTab(pages, {
+    host: "juwa777.com",
+    logPrefix: "[juwa]",
+    panelName: "Juwa",
+    panelUrlHint: "https://ht.juwa777.com/login",
+  });
 }
 
 export async function openBrowserSession(): Promise<BrowserSession> {

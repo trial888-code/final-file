@@ -1,9 +1,8 @@
 # Spinora Gameroom Bot
 
 Automates the **Gameroom** agent panel (`agentserver1.gameroom777.com`) for account
-creation, recharge (load), redeem, and balance checks. Same "Backend" panel
-software as the Vegas Sweeps bot, so the logic is shared. It polls the same
-Supabase queue but only claims jobs for the `game-vault` game.
+creation, recharge (load), redeem, and balance checks. Layui admin panel with iframe
+player views.
 
 ## Setup
 
@@ -11,39 +10,44 @@ Supabase queue but only claims jobs for the `game-vault` game.
 cd workers/gameroom-bot
 npm install
 npx playwright install chrome
-cp .env.example .env   # then fill in the values
+cp ../bot.env.example .env   # then run sync-bot-env.bat + set-bot-credentials.bat
 ```
 
-Fill `.env`:
+Fill `.env` (or sync from `workers/.env`):
 
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — same project as Spinora.
-- `GAMEROOM_ADMIN_URL=https://agentserver1.gameroom777.com/login`
-- `GAMEROOM_AGENT_USERNAME` (used only to pre-fill the login form)
+- `GAMEROOM_AGENT_USERNAME` / `GAMEROOM_AGENT_PASSWORD` — agent panel login.
+- `CAPTCHA_API_KEY` — 2Captcha for auto-login.
 
-## Running (the panel needs a CAPTCHA, so use CDP mode)
+## Running (unified Chrome — recommended)
+
+```bat
+cd workers
+sync-bot-env.bat
+start-unified-chrome.bat        REM one Chrome, port 9222
+start-all-bots-unified.bat      REM all 8 bots share that Chrome
+```
+
+Or single-bot:
 
 ```bat
 start-chrome-for-bot.bat        REM opens Chrome on port 9225
-REM log in to the panel manually (type the captcha)
-REM set GAMEROOM_CDP_URL=http://127.0.0.1:9225 in .env
+REM log in to the panel (or let bot auto-login with CAPTCHA)
+set GAMEROOM_CDP_URL=http://127.0.0.1:9225
 start-bot.bat
 ```
-
-If the Chrome session expires, re-run `start-chrome-for-bot.bat`, log in again,
-then restart `start-bot.bat`.
 
 ## Verifying selectors (optional)
 
 ```bash
-GAMEROOM_HEADLESS=false npm run probe          # login + user list dump
-node scripts/probe-dialogs.mjs                  # capture create/recharge/redeem dialogs (CDP)
-npx tsx scripts/test-readonly.ts <account>      # read a balance (no money moves)
+GAMEROOM_HEADLESS=false npm run probe
+npx tsx scripts/test-readonly.ts <account>
 ```
 
 ## How jobs flow
 
-1. The website inserts a `game_load_requests` row (slug `game-vault`).
-2. This worker calls `claim_next_game_load('game-vault')`.
+1. The website inserts a `game_load_requests` row (slug `gameroom`).
+2. This worker calls `claim_next_game_load('gameroom')`.
 3. It performs the panel action and calls `complete_game_load(...)`.
 4. The user gets an in-app notification with the result.
 

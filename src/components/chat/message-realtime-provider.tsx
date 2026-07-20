@@ -102,9 +102,8 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
 
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       userIdRef.current = null;
@@ -437,15 +436,16 @@ export function MessageRealtimeProvider({ children }: { children: ReactNode }) {
     };
 
     // Defer first sync so the page paints before network work.
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) runSync();
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) runSync();
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) runSync();
-      else {
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        runSync();
+      } else if (event === "SIGNED_OUT") {
         userIdRef.current = null;
         setActiveUserId(null);
         setConversationIds([]);

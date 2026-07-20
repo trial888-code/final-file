@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminBulkLandingGenerator } from "@/components/admin/admin-bulk-landing-generator";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";
 import {
   EntityEditDialog,
@@ -39,10 +40,10 @@ export default async function AdminGeoPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <AdminPageHeader
-          title="Geo Pages"
+          title="Geo Pages & Landing Generator"
           description="States and cities power the /[state] and /[state]/[city] landing pages. New entries appear without a redeploy."
         />
         <EntityEditDialog
@@ -74,7 +75,10 @@ export default async function AdminGeoPage() {
         />
       </div>
 
-      <div className="mt-6 space-y-4">
+      {/* 1-Click Bulk SEO Landing Page Generator */}
+      <AdminBulkLandingGenerator />
+
+      <div className="space-y-4">
         {states.map((state) => {
           const cities = citiesByState.get(state.id) ?? [];
           return (

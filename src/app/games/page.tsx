@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Navbar } from "@/components/layout/navbar";
-import { Footer } from "@/components/layout/footer";
+import { VipPageLayout } from "@/components/layout/vip-page-layout";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { MarketingGameGrid } from "@/components/marketing/game-grid";
 import { getGames } from "@/lib/data/marketing";
@@ -20,9 +19,8 @@ export default async function GamesCatalogPage() {
   const catalog = await getGames();
 
   return (
-    <>
-      <Navbar />
-      <main className="pt-24 pb-16">
+    <VipPageLayout>
+      <main className="pb-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Breadcrumbs items={[{ name: "Home", href: "/" }, { name: "Games" }]} />
 
@@ -42,7 +40,6 @@ export default async function GamesCatalogPage() {
           catalog={catalog}
         />
       </main>
-      <Footer />
-    </>
+    </VipPageLayout>
   );
 }

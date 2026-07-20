@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ALL_50_US_STATES } from "@/lib/geo-all-50-states";
 
 import {
   AdminActionResult,
@@ -18,6 +20,146 @@ function revalidateGeo(stateSlug?: string, citySlug?: string) {
   revalidatePath("/");
   if (stateSlug) revalidatePath(`/${stateSlug}`);
   if (stateSlug && citySlug) revalidatePath(`/${stateSlug}/${citySlug}`);
+}
+
+export async function bulkGenerateGeoPagesAction(): Promise<AdminActionResult> {
+  const auth = await authorize(PERMISSION);
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const admin = createAdminClient();
+  const db = admin || adminDb();
+  let createdCount = 0;
+
+  for (const st of ALL_50_US_STATES) {
+    let { data: existingState } = await db
+      .from("geo_states")
+      .select("id")
+      .eq("slug", st.slug)
+      .maybeSingle();
+
+    let stateId = existingState?.id;
+
+    if (!stateId) {
+      const { data: newState } = await db
+        .from("geo_states")
+        .insert({
+          name: st.name,
+          slug: st.slug,
+          abbr: st.abbr,
+          hero_lede: st.lede,
+          meta_description: st.lede,
+          sort_order: createdCount,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+
+      if (newState) {
+        stateId = newState.id;
+        createdCount += 1;
+      }
+    }
+
+    if (stateId) {
+      for (const ct of st.cities) {
+        const { data: existingCity } = await db
+          .from("geo_cities")
+          .select("id")
+          .eq("state_id", stateId)
+          .eq("slug", ct.slug)
+          .maybeSingle();
+
+        if (!existingCity) {
+          await db.from("geo_cities").insert({
+            state_id: stateId,
+            slug: ct.slug,
+            name: ct.name,
+            description_snippet: ct.desc,
+            sort_order: createdCount,
+            is_active: true,
+          });
+          createdCount += 1;
+        }
+      }
+    }
+  }
+
+  revalidatePath("/admin/geo");
+  revalidatePath("/");
+  revalidatePath("/sitemap.xml");
+
+  await writeAudit({
+    actorId: auth.staff.userId,
+    action: "geo.bulk_generate",
+    entityType: "geo_state",
+    after: { createdCount },
+  });
+
+  return { ok: true, message: `Published ${createdCount} new geo pages to database.` };
+}
+
+export async function listGeoPagesAction(): Promise<{
+  ok: boolean;
+  states?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    abbr: string;
+    cities: Array<{ id: string; name: string; slug: string }>;
+  }>;
+  error?: string;
+}> {
+  const auth = await authorize(PERMISSION);
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const db = adminDb();
+  const { data: states, error } = await db
+    .from("geo_states")
+    .select("id, name, slug, abbr, geo_cities(id, name, slug)")
+    .eq("is_active", true)
+    .order("sort_order");
+
+  if (error) return { ok: false, error: error.message };
+
+  return {
+    ok: true,
+    states: (states ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      abbr: s.abbr,
+      cities: ((s as { geo_cities?: Array<{ id: string; name: string; slug: string }> }).geo_cities ?? []).map(
+        (c) => ({ id: c.id, name: c.name, slug: c.slug })
+      ),
+    })),
+  };
+}
+
+export async function deleteGeoPageAction(
+  type: "state" | "city",
+  id: string,
+  stateSlug?: string
+): Promise<AdminActionResult> {
+  const auth = await authorize(PERMISSION);
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const admin = createAdminClient();
+  const db = admin || adminDb();
+
+  if (type === "state") {
+    await db.from("geo_states").delete().eq("id", id);
+  } else {
+    await db.from("geo_cities").delete().eq("id", id);
+  }
+
+  revalidateGeo(stateSlug);
+  await writeAudit({
+    actorId: auth.staff.userId,
+    action: type === "state" ? "geo_state.delete" : "geo_city.delete",
+    entityType: type === "state" ? "geo_state" : "geo_city",
+    entityId: id,
+  });
+  return { ok: true, message: "Page deleted successfully." };
 }
 
 // ── States ───────────────────────────────────────────────────────────────────

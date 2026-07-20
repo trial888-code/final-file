@@ -88,6 +88,17 @@ export function GeoPageTemplate({ state, city }: GeoPageTemplateProps) {
           </h1>
           <p className="mt-4 max-w-2xl text-muted-foreground leading-relaxed">{lede}</p>
 
+          {state.heroImageUrl && (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-border/60 max-w-3xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={state.heroImageUrl}
+                alt={`${locationName} online gaming`}
+                className="w-full h-48 sm:h-64 object-cover"
+              />
+            </div>
+          )}
+
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild>
               <Link href="/register">Create free account</Link>

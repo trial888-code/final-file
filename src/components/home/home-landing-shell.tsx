@@ -18,6 +18,13 @@ import {
 } from "@/lib/games";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useLobbyProfile } from "@/components/home/lobby/use-lobby-profile";
+import { LobbyAppShell } from "@/components/home/lobby/lobby-app-shell";
+import { LobbySidebar, type LobbyMenuId } from "@/components/home/lobby/lobby-sidebar";
+import { LobbyWelcomeBanner } from "@/components/home/lobby/lobby-welcome-banner";
+import { LobbyRightPanel } from "@/components/home/lobby/lobby-right-panel";
+import { LobbyGameGrid } from "@/components/home/lobby/lobby-game-grid";
+import { filterLobbyGames } from "@/components/home/lobby/lobby-games";
 
 import { LazyWhenVisible } from "@/components/ui/lazy-when-visible";
 
@@ -91,16 +98,16 @@ export function HomeLandingShell({
   cmsSections,
 }: HomeLandingShellProps) {
   const router = useRouter();
+  const { isLoggedIn, ready: authReady } = useLobbyProfile();
+  const loggedIn = authReady ? isLoggedIn : initialLoggedIn;
+
   const [sidebarTab, setSidebarTab] = useState<GameTab>("all");
   const [mainTab, setMainTab] = useState<HomeGameTab>("trending");
+  const [lobbyMenu, setLobbyMenu] = useState<LobbyMenuId>("lobby");
   const [search, setSearch] = useState("");
   const [useSidebarFilter, setUseSidebarFilter] = useState(false);
   const gamesRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-
-  const displayGames = useSidebarFilter
-    ? filterGames(sidebarTab, search)
-    : filterHomeGames(mainTab, search);
 
   function handleSidebarTab(tab: GameTab) {
     setSidebarTab(tab);
@@ -126,6 +133,65 @@ export function HomeLandingShell({
     focusSearch();
   }
 
+  function handleLobbyMenuChange(menu: LobbyMenuId) {
+    setLobbyMenu(menu);
+    gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const displayGames = loggedIn
+    ? filterLobbyGames(lobbyMenu, search)
+    : useSidebarFilter
+      ? filterGames(sidebarTab, search)
+      : filterHomeGames(mainTab, search);
+
+  if (!authReady) {
+    return (
+      <div className="lobby-cosmic min-h-screen flex items-center justify-center">
+        <div
+          className="w-10 h-10 rounded-full border-2 border-purple-600 border-t-amber-400 animate-spin"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
+  /* ── VIP Casino Lobby (logged-in) ── */
+  if (loggedIn) {
+    return (
+      <LobbyAppShell
+        sidebar={
+          <LobbySidebar activeMenu={lobbyMenu} onMenuChange={handleLobbyMenuChange} />
+        }
+      >
+        {/* Top row: banner + right widgets (matches reference) */}
+        <div className="lobby-hero-row flex gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <LobbyWelcomeBanner />
+          </div>
+          <div className="hidden lg:block w-[188px] xl:w-[200px] shrink-0">
+            <LobbyRightPanel />
+          </div>
+        </div>
+
+        {/* Mobile widgets */}
+        <div className="lg:hidden mb-2">
+          <LobbyRightPanel />
+        </div>
+
+        <section ref={gamesRef} id="games" className="scroll-mt-2">
+          {displayGames.length > 0 ? (
+            <LobbyGameGrid games={displayGames} />
+          ) : (
+            <p className="text-center py-12 text-purple-300/60 text-sm">No games found.</p>
+          )}
+        </section>
+
+        <DeferredActivityToast />
+      </LobbyAppShell>
+    );
+  }
+
+  /* ── Public landing (logged-out) ── */
   return (
     <AppShell
       onSearchClick={handleHeaderSearch}

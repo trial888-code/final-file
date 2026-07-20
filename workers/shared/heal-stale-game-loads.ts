@@ -44,7 +44,7 @@ export async function healStaleGameLoadsForSlug(
     .update({
       status: "failed",
       error_message:
-        "Bot could not complete after several tries. Restart cash-frenzy-bot, then try Replace again.",
+        "Bot could not complete after several tries. Restart the game bot, then try Replace again.",
       updated_at: new Date().toISOString(),
     })
     .eq("game_slug", gameSlug)

@@ -6,6 +6,7 @@
     "start": "tsx src/index.ts",
     "run-once": "tsx src/index.ts --once",
     "probe": "node scripts/probe-panel.mjs",
+    "test-captcha": "tsx scripts/test-captcha-login.mjs",
     "codegen": "playwright codegen https://agent.gamevault999.com/login"
   },
   "dependencies": {

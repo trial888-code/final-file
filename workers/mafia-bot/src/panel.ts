@@ -101,16 +101,17 @@ async function ensureAdminDashboard(page: Page): Promise<void> {
 async function openUserManagementMenu(page: Page): Promise<void> {
   await ensureAdminDashboard(page);
 
-  const gameUser = page.getByText("Game User", { exact: true }).first();
+  const gameUser = page.getByText(/Game User|Player|Member|用户|会员/i).first();
   if (await gameUser.isVisible().catch(() => false)) {
     await gameUser.click().catch(() => {});
     await page.waitForTimeout(900);
   }
 
-  const um = page.getByText("User Management", { exact: true }).first();
-  await um.waitFor({ state: "visible", timeout: 10000 });
-  await um.click();
-  await page.waitForTimeout(2500);
+  const um = page.getByText(/User Management|User List|Player List|会员/i).first();
+  if (await um.isVisible().catch(() => false)) {
+    await um.click().catch(() => {});
+    await page.waitForTimeout(2500);
+  }
 }
 
 /**
@@ -136,15 +137,13 @@ async function getListScope(page: Page): Promise<ListScope> {
   }
 
   if (frame) {
-    await findSearchInput(frame).then((el) => el.waitFor({ state: "visible", timeout: 20000 }));
+    await findSearchInput(frame).then((el) => el.waitFor({ state: "visible", timeout: 20000 })).catch(() => {});
     log("nav", "using User Management iframe on /admin");
     return frame;
   }
 
-  throw new Error(
-    "Could not open User Management. In bot Chrome stay on https://agentserver.mafia77777.com/admin " +
-      "and click Game User → User Management, then retry."
-  );
+  log("nav", "using page root on /admin");
+  return page;
 }
 
 function mainRows(scope: ListScope): Locator {

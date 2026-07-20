@@ -10,8 +10,12 @@ const USER_MGMT_URL = `${BASE_URL}/userManagement`;
 /* ------------------------------------------------------------------ login */
 
 export async function loginToPanel(page: Page): Promise<void> {
-  await page.goto(USER_MGMT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  const alreadyOnPanel =
+    /userManagement/i.test(page.url()) && !(await isLoginPage(page));
+  if (!alreadyOnPanel) {
+    await page.goto(USER_MGMT_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  }
 
   if (!(await isLoginPage(page))) {
     log("login", "already authenticated");
@@ -113,7 +117,7 @@ async function searchAccount(page: Page, account: string): Promise<void> {
   const btn = page.getByRole("button", { name: /^\s*search\s*$/i }).first();
   if (await btn.isVisible().catch(() => false)) await btn.click();
   else await search.press("Enter");
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(1000);
 }
 
 /** Row in the main list whose Account cell exactly equals `account`. */

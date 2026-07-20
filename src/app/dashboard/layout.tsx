@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { AccountSidebar } from "@/components/layout/account-sidebar";
+import { LobbyAccountSidebar } from "@/components/home/lobby/lobby-account-sidebar";
 import { CompleteProfilePrompt } from "@/components/auth/complete-profile-prompt";
 import { WalletCardWithSync } from "@/components/wallet/wallet-card-with-sync";
 import { DashboardProfileProvider } from "@/lib/dashboard/dashboard-profile-context";
@@ -26,10 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const initialWallet = walletBalanceFromProfile(profile);
 
   const sidebar = (
-    <>
-      <WalletCardWithSync initial={initialWallet} />
-      <AccountSidebar />
-    </>
+    <LobbyAccountSidebar walletSlot={<WalletCardWithSync initial={initialWallet} />} />
   );
 
   return (

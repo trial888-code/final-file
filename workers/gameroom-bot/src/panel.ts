@@ -40,8 +40,15 @@ function isAdminDashboard(url: string): boolean {
 /* ------------------------------------------------------------------ login */
 
 export async function loginToPanel(page: Page): Promise<void> {
-  await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  await page.bringToFront().catch(() => {});
+
+  const onDashboard =
+    (isAdminDashboard(page.url()) || /player\/index/i.test(page.url())) &&
+    !(await isLoginPage(page));
+  if (!onDashboard) {
+    await page.goto(ADMIN_HOME, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  }
 
   if (!(await isLoginPage(page))) {
     await getListScope(page);

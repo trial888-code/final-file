@@ -23,6 +23,7 @@ import {
 } from "@/lib/admin/spinora-profile";
 import { requireStaff } from "@/lib/data/admin";
 import { getDashboardStats } from "@/lib/data/admin-stats";
+import { AdminGameBotWorkerCard } from "@/components/admin/admin-game-bot-worker-card";
 
 export default async function AdminOverviewPage() {
   const ctx = await requireStaff();
@@ -114,6 +115,156 @@ export default async function AdminOverviewPage() {
           accent="emerald"
         />
       </div>
+
+      {/* 🎮 Juwa 777 & Game Platform Bot Worker Control Card */}
+      <div className="mt-6">
+        <AdminGameBotWorkerCard />
+      </div>
+
+      {/* Non-Coder Friendly Quick Action Command Center */}
+      <GlassCard className="mt-6 p-6">
+        <div className="flex items-center justify-between border-b border-border/50 pb-3 mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">✨ Non-Coder Quick Actions</h2>
+            <p className="text-xs text-muted-foreground">1-Click admin shortcuts to easily manage your site, AI tools, and telegram bot without code.</p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-ws-green/15 text-ws-green-deep dark:text-ws-green">
+            Admin Helper
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            href="/admin/kyc"
+            className="flex items-center gap-3 p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/30 text-emerald-300 group-hover:scale-110 transition-transform">
+              🛡️
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">KYC Review</p>
+              <p className="text-xs text-muted-foreground">Approve player IDs</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/analytics"
+            className="flex items-center gap-3 p-3 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-purple-500/30 text-purple-300 group-hover:scale-110 transition-transform">
+              📊
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Revenue Analytics</p>
+              <p className="text-xs text-muted-foreground">Live volume & reports</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/marketing"
+            className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/30 text-amber-300 group-hover:scale-110 transition-transform">
+              🎟️
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Marketing Hub</p>
+              <p className="text-xs text-muted-foreground">1-Click promo codes</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/bot-status"
+            className="flex items-center gap-3 p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/30 text-emerald-300 group-hover:scale-110 transition-transform">
+              🤖
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">8-Bot Control Room</p>
+              <p className="text-xs text-muted-foreground">24/7 worker status</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/ai-blog"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-ws-green/10 hover:border-ws-green/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-ws-green/20 text-ws-green group-hover:scale-110 transition-transform">
+              ✨
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">AI Auto Blog</p>
+              <p className="text-xs text-muted-foreground">Generate SEO posts</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/telegram"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-sky-500/10 hover:border-sky-500/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-sky-500/20 text-sky-400 group-hover:scale-110 transition-transform">
+              🚀
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Telegram Bot</p>
+              <p className="text-xs text-muted-foreground">Send broadcast</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/requests"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-amber-500/10 hover:border-amber-500/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform">
+              💳
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Deposit Requests</p>
+              <p className="text-xs text-muted-foreground">Fulfill user loads</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/games"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-rose-500/10 hover:border-rose-500/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400 group-hover:scale-110 transition-transform">
+              🎮
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Manage Games</p>
+              <p className="text-xs text-muted-foreground">Add or update games</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/cms"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-indigo-500/10 hover:border-indigo-500/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform">
+              📝
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">CMS & FAQs</p>
+              <p className="text-xs text-muted-foreground">Banners & text</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/settings"
+            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-background/50 hover:bg-teal-500/10 hover:border-teal-500/40 transition-all group"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-teal-500/20 text-teal-400 group-hover:scale-110 transition-transform">
+              ⚙️
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">Site Settings</p>
+              <p className="text-xs text-muted-foreground">Cashtags & configs</p>
+            </div>
+          </Link>
+        </div>
+      </GlassCard>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <GlassCard className="p-6">

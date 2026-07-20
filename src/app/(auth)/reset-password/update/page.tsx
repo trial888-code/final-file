@@ -51,10 +51,10 @@ async function resolveRecoverySession(supabase: SupabaseClient): Promise<boolean
   }
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return Boolean(session);
+  return Boolean(user);
 }
 
 export default function UpdatePasswordPage() {
@@ -89,8 +89,8 @@ export default function UpdatePasswordPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled || !session) return;
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (cancelled) return;
       if (event === "INITIAL_SESSION" || event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         sessionFound.current = true;
         setHasSession(true);
@@ -101,9 +101,9 @@ export default function UpdatePasswordPage() {
 
     const timeout = window.setTimeout(() => {
       if (cancelled || sessionFound.current) return;
-      void supabase.auth.getSession().then(({ data: { session } }) => {
+      void supabase.auth.getUser().then(({ data: { user } }) => {
         if (cancelled) return;
-        if (session) {
+        if (user) {
           sessionFound.current = true;
           setHasSession(true);
         }

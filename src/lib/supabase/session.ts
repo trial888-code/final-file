@@ -5,9 +5,9 @@ import type { Profile } from "@/types/database";
 export const getAuthUser = cache(async () => {
   const supabase = await createClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.user ?? null;
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ?? null;
 });
 
 export const getProfile = cache(async (): Promise<Profile | null> => {

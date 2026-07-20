@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { OrganizationSchema, WebsiteSchema, HomeGamesItemListSchema, HomeFaqSchema } from "@/lib/seo/json-ld";
 import { homeMetadata } from "@/lib/seo/metadata";
 import { ClientProviders } from "@/components/providers/client-providers";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { LiveCasinoChatWidget } from "@/components/chat/live-casino-chat-widget";
 import "./globals.css";
 
 const inter = Inter({
@@ -15,7 +17,7 @@ const inter = Inter({
 export const metadata: Metadata = homeMetadata;
 
 export const viewport: Viewport = {
-  themeColor: "#121212",
+  themeColor: "#030008",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -33,7 +35,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preload" href="/logo.webp" as="image" type="image/webp" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders>
+          {children}
+          <LiveCasinoChatWidget />
+          <MobileBottomNav />
+        </ClientProviders>
       </body>
     </html>
   );

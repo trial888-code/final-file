@@ -51,9 +51,8 @@ export function UserAccountMenu({ compact = false }: { compact?: boolean }) {
       const supabase = createClient();
       if (!supabase) return;
       const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
       setEmail(user.email ?? "");

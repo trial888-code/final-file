@@ -7,7 +7,7 @@ echo.
 echo ============================================================
 echo   SPINORA - BOT HEALTH CHECK
 echo ============================================================
-echo   Checks .env, npm deps, and Chrome debug ports (9222-9229).
+echo   Checks .env, npm deps, agent login, and unified Chrome (port 9222).
 echo   Does NOT log into agent panels — you still verify those manually.
 echo ============================================================
 echo.
@@ -31,11 +31,11 @@ echo   SUMMARY: !PASS! ready  ^|  !WARN! warnings  ^|  !FAIL! need fix
 echo ============================================================
 echo.
 if !FAIL! GTR 0 (
-  echo   Fix FAIL items above, then run start-all-chrome.bat and start-all-bots.bat
+  echo   Fix FAIL items above, then run sync-bot-env.bat and smoke-check.bat
 ) else if !WARN! GTR 0 (
-  echo   Code looks OK. Start Chrome, log in to each panel, then start-all-bots.bat
+  echo   Run set-bot-credentials.bat, start-unified-chrome.bat, start-all-bots-unified.bat
 ) else (
-  echo   All bots configured. Run start-all-chrome.bat then start-all-bots.bat
+  echo   All bots ready. Run start-all-advanced-free.bat for 24/7 mode.
 )
 echo.
 pause
@@ -71,6 +71,14 @@ if errorlevel 1 (
   goto :print_row
 )
 
+findstr /i "AGENT_USERNAME PANEL_USERNAME" "%BOT_DIR%\.env" | findstr /v "^#" | findstr /v "your_" >nul
+if errorlevel 1 (
+  set "STATUS=WARN"
+  set "DETAIL=no agent login — run set-bot-credentials.bat"
+  set /a WARN+=1
+  goto :print_row
+)
+
 if not exist "%BOT_DIR%\node_modules" (
   set "STATUS=WARN"
   set "DETAIL=run npm install in %BOT_DIR%"
@@ -78,14 +86,14 @@ if not exist "%BOT_DIR%\node_modules" (
   goto :print_row
 )
 
-curl.exe -s -o nul -w "%%{http_code}" http://127.0.0.1:%BOT_PORT%/json/version 2>nul | findstr /r "^200$" >nul
+curl.exe -s -o nul -w "%%{http_code}" http://127.0.0.1:9222/json/version 2>nul | findstr /r "^200$" >nul
 if errorlevel 1 (
   set "STATUS=WARN"
-  set "DETAIL=Chrome not on port %BOT_PORT% yet"
+  set "DETAIL=Unified Chrome not on port 9222 yet"
   set /a WARN+=1
 ) else (
   set /a PASS+=1
-  set "DETAIL=Chrome OK on %BOT_PORT%"
+  set "DETAIL=Chrome OK on 9222 (unified mode)"
 )
 goto :print_row
 
