@@ -147,7 +147,7 @@ export function GameLandingClient({
         .eq("status", "completed")
         .in("load_type", ["create_account", "new_account"])
         .not("game_username", "is", null)
-        .order("completed_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 

@@ -1,6 +1,8 @@
 import { sendTelegramPhoto, sendTelegramMessage, escapeTelegramHtml } from "@/lib/telegram/client";
 import { GeneratedBlogPost } from "@/lib/ai/blog-generator";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
+
 export interface TelegramBroadcastOptions {
   header?: string;
   footer?: string;
@@ -15,8 +17,8 @@ export function formatBlogTelegramMessage(
   const header = options?.header || "🔥 <b>SPINORA AI GAMING UPDATE</b> 🔥";
   const footer = options?.footer || "👉 Join Spinora & Claim Exclusive Bonus Credits! 🚀";
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
-  const postLink = `${siteUrl}/blog/${post.slug}`;
+  const postLink = `${SITE_URL}/blog/${post.slug}`;
+
 
   const keywordsTag = post.seo_keywords
     .slice(0, 3)
@@ -49,7 +51,9 @@ export async function broadcastBlogPostToTelegram(
   const messageText = formatBlogTelegramMessage(post, options);
 
   if (post.cover_image) {
-    const photoResult = await sendTelegramPhoto(post.cover_image, messageText, {
+    const isAbsolute = post.cover_image.startsWith("http://") || post.cover_image.startsWith("https://");
+    const photoUrl = isAbsolute ? post.cover_image : `${SITE_URL}${post.cover_image}`;
+    const photoResult = await sendTelegramPhoto(photoUrl, messageText, {
       channel: options?.channel || "promo",
     });
     if (photoResult.ok) return { ok: true };
@@ -65,8 +69,8 @@ export async function broadcastPromoToTelegram(
   description: string,
   promoUrl?: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";
-  const link = promoUrl || `${siteUrl}/promotions`;
+  const link = promoUrl || `${SITE_URL}/promotions`;
+
 
   const text = `
 🎉 <b>SPECIAL SPINORA PROMOTION</b> 🎉

@@ -30,6 +30,7 @@ async function handleCron(request: Request) {
     .from("blog_posts")
     .select("*")
     .eq("status", "published")
+    .eq("telegram_sent", false)
     .order("published_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -54,6 +55,10 @@ async function handleCron(request: Request) {
         footer: telegramSettings.template_footer,
       }
     );
+
+    if (result.ok) {
+      await db.from("blog_posts").update({ telegram_sent: true }).eq("id", latestPost.id);
+    }
 
     return NextResponse.json({
       success: true,

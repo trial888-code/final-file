@@ -4,40 +4,40 @@
  * for every single blog post so 100+ daily posts rank #1 on Google without duplicate image penalties.
  */
 
-const CATEGORY_SEO_IMAGES = {
-  // Slots, 777, Reels, Jackpots
-  slots: [
-    "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1511193311914-0346f16efe90?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1606167668584-78701c57f13d?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
-  ],
-  // Fish Tables, Juwa, Fire Kirin, Arcade
-  fishTable: [
-    "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=1200&q=80",
-  ],
-  // Deposits, Cash App, Zelle, Bitcoin, Bonuses
-  deposits: [
-    "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80",
-  ],
-  // VIP Rewards, Wheel Spins, Promos, Strategy
-  vipRewards: [
-    "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1551103782-8ab07afd45c1?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80",
-  ],
-};
+const LOCAL_GAME_POSTERS = [
+  "/games/fire-kirin.webp",
+  "/games/orion-stars.webp",
+  "/games/juwa.webp",
+  "/games/game-vault.webp",
+  "/games/panda-master.webp",
+  "/games/milky-way.webp",
+  "/games/vegas-sweeps.webp",
+  "/games/ultrapanda.webp",
+  "/games/gameroom.webp",
+  "/games/mafia.webp",
+  "/games/cash-machine.webp",
+  "/games/cash-frenzy.webp",
+  "/games/mr-all-in-one.webp",
+  "/games/buffalo-link.webp",
+  "/games/ocean-king.webp",
+  "/games/ace-book.webp",
+  "/games/blue-dragon.webp",
+  "/games/dragon-master.webp",
+  "/games/fish-hunter.webp",
+  "/games/galaxy-games.webp",
+  "/games/golden-dragon.webp",
+  "/games/high-stakes.webp",
+  "/games/lucky-lion.webp",
+  "/games/lucky-slots.webp",
+  "/games/mega-spin.webp",
+  "/games/monster-hunter.webp",
+  "/games/moolah.webp",
+  "/games/pharaohs-treasure.webp",
+  "/games/river-sweeps.webp",
+  "/games/vb-game.webp",
+  "/games/vblink.webp",
+];
+
 
 function hashString(str: string): number {
   let hash = 0;
@@ -49,33 +49,48 @@ function hashString(str: string): number {
 }
 
 /**
- * Pro SEO Cover Resolver:
- * Ensures 100+ daily blogs receive UNIQUE, high-converting, topic-matched images
- * with dynamic unique image parameters so Google never flags duplicate images.
+ * Pro Cover Resolver:
+ * Resolves actual game platform graphics for blog post headers & cards.
  */
 export function resolveBlogCoverUrl(slug: string, url: string | null): string {
-  // If post already has a custom valid image URL (e.g. uploaded or external), use it
-  if (url && (url.startsWith("/images/") || (url.startsWith("http") && !url.includes("pexels.com")))) {
+  // If post already has a custom valid image URL (e.g. uploaded or local), use it
+  if (url && (url.startsWith("/images/") || url.startsWith("/games/") || (url.startsWith("http") && !url.includes("pexels.com") && !url.includes("unsplash.com")))) {
     return url;
   }
 
   const s = slug.toLowerCase();
-  const hash = hashString(slug);
 
-  let pool = CATEGORY_SEO_IMAGES.vipRewards;
+  // 1. Content-to-Photo Matcher: Resolve actual game platform graphics
+  const GAME_COVERS: Record<string, string> = {
+    "orion-stars": "/games/orion-stars.webp",
+    "game-vault": "/games/game-vault.webp",
+    "juwa": "/games/juwa.webp",
+    "fire-kirin": "/games/fire-kirin.webp",
+    "mr-all-in-one": "/games/mr-all-in-one.webp",
+    "cash-machine": "/games/cash-machine.webp",
+    "cash-frenzy": "/games/cash-frenzy.webp",
+    "panda-master": "/games/panda-master.webp",
+    "vblink": "/games/vblink.webp",
+    "milky-way": "/games/milky-way.webp",
+    "vegas-sweeps": "/games/vegas-sweeps.webp",
+    "ultrapanda": "/games/ultrapanda.webp",
+    "gameroom": "/games/gameroom.webp",
+    "mafia": "/games/mafia.webp",
+    "buffalo": "/games/buffalo-link.webp",
+    "ocean-king": "/games/ocean-king.webp",
+  };
 
-  if (s.includes("slot") || s.includes("777") || s.includes("jackpot") || s.includes("vblink") || s.includes("frenzy") || s.includes("sweeps")) {
-    pool = CATEGORY_SEO_IMAGES.slots;
-  } else if (s.includes("fish") || s.includes("juwa") || s.includes("kirin") || s.includes("orion") || s.includes("vault") || s.includes("panda") || s.includes("mafia")) {
-    pool = CATEGORY_SEO_IMAGES.fishTable;
-  } else if (s.includes("deposit") || s.includes("cashapp") || s.includes("zelle") || s.includes("crypto") || s.includes("bonus") || s.includes("freeplay") || s.includes("code")) {
-    pool = CATEGORY_SEO_IMAGES.deposits;
+  for (const [key, imagePath] of Object.entries(GAME_COVERS)) {
+    if (s.includes(key) || s.replace(/-/g, "").includes(key.replace(/-/g, ""))) {
+      return imagePath;
+    }
   }
 
-  const baseImage = pool[hash % pool.length];
-  // Add unique query parameter per slug so every single blog post has a 100% UNIQUE image URL footprint for Google SEO!
-  return `${baseImage}&post_id=${slug}&sig=${hash}`;
+  // 2. High-res local Spinora game posters fallback
+  const hash = hashString(slug);
+  return LOCAL_GAME_POSTERS[hash % LOCAL_GAME_POSTERS.length];
 }
+
 
 export function isLocalGameCover(src: string): boolean {
   return src.startsWith("/games/") || src.startsWith("/images/");

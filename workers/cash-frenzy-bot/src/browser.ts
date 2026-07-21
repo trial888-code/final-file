@@ -19,7 +19,7 @@ function launchOptions() {
 
   return {
     headless,
-    slowMo: headless ? 0 : 100,
+    slowMo: headless ? 0 : (process.env.BOT_SLOWMO ? Number(process.env.BOT_SLOWMO) : 100),
     ...(browserKind === "chromium" ? {} : { channel: browserKind as "chrome" }),
     proxy: proxy ? { server: proxy } : undefined,
     args: ["--disable-blink-features=AutomationControlled"],
@@ -67,7 +67,7 @@ export async function openBrowserSession(): Promise<BrowserSession> {
   if (cdpUrl) {
     console.log("[cf] Connecting to your Chrome via CDP (VPN should already be on)…");
     try {
-      const browser = await chromium.connectOverCDP(cdpUrl, { slowMo: 100 });
+      const browser = await chromium.connectOverCDP(cdpUrl, { slowMo: process.env.BOT_SLOWMO ? Number(process.env.BOT_SLOWMO) : 100 });
       const allPages = browser.contexts().flatMap((ctx) => ctx.pages());
       const page = allPages.length > 0 ? await findPanelPage(allPages) : await browser.contexts()[0]!.newPage();
       return {

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminBulkLandingGenerator } from "@/components/admin/admin-bulk-landing-generator";
 import { ConfirmActionButton } from "@/components/admin/confirm-action-button";

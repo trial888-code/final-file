@@ -21,19 +21,9 @@ export async function POST(req: Request) {
       orderDescription: `Spinora Casino Deposit $${amount}`,
     });
 
-    // Record pending transaction in Supabase
-    const admin = createAdminClient();
-    if (admin && userId) {
-      try {
-        await admin.from("wallet_audit_logs").insert({
-          user_id: userId,
-          action: "nowpayments_deposit_requested",
-          amount: Number(amount),
-          metadata: { orderId, invoiceUrl: invoice.invoice_url },
-        });
-      } catch (dbErr) {
-        console.warn("[nowpayments/create] DB log warning:", dbErr);
-      }
+    // Record pending transaction log on server console
+    if (userId) {
+      console.log(`[nowpayments/create] Deposit requested: user ${userId}, amount ${amount}, orderId ${orderId}, invoiceUrl ${invoice.invoice_url}`);
     }
 
     return NextResponse.json(invoice);

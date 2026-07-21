@@ -213,7 +213,7 @@ async function searchAccount(page: Page, account: string): Promise<ListScope> {
 
   await rootPage(scope).waitForTimeout(400);
   await scope
-    .locator(".layui-table-loading")
+    .locator(".layui-table-loading, .layui-table-init, .layui-icon-loading")
     .first()
     .waitFor({ state: "hidden", timeout: 12000 })
     .catch(() => {});
@@ -400,7 +400,7 @@ async function waitForAccountListed(page: Page, username: string, timeoutMs = 22
   if (await reset.isVisible().catch(() => false)) {
     await reset.click().catch(() => {});
     await page.waitForTimeout(1200);
-    await scope.locator(".layui-table-loading").first().waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+    await scope.locator(".layui-table-loading, .layui-table-init, .layui-icon-loading").first().waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
     if (await accountVisibleInTable(scope, username)) return true;
   }
 

@@ -74,16 +74,14 @@ const db = createClient(url, key, { auth: { persistSession: false } });
 const profileCols = [
   "email",
   "full_name",
-  "username",
-  "display_name",
-  "xp",
-  "level",
-  "coins_balance",
+  "avatar_url",
   "wallet_balance",
   "cashout_wallet",
-  "is_banned",
   "is_suspended",
   "last_seen_at",
+  "vip_tier",
+  "vip_points",
+  "role",
 ];
 
 async function checkTable(name) {
@@ -121,27 +119,27 @@ async function main() {
   console.log(`RBAC user_roles rows (sample): ${roleRows?.length ?? 0}`);
 
   console.log("\n--- Tables ---");
-  const missing = [];
-  const ok = [];
+  const missingTable = [];
+  const okTable = [];
   for (const t of TABLES) {
     const r = await checkTable(t);
-    if (r.ok) ok.push(t);
+    if (r.ok) okTable.push(t);
     else {
-      missing.push({ t, ...r });
+      missingTable.push({ t, ...r });
       console.log(`MISSING  ${t}: ${r.message}`);
     }
   }
-  console.log(`\nOK: ${ok.length}/${TABLES.length} tables reachable`);
-  if (missing.length === 0) {
+  console.log(`\nOK: ${okTable.length}/${TABLES.length} tables reachable`);
+  if (missingTable.length === 0) {
     console.log("All checked tables exist.");
   } else {
-    console.log(`Missing/failed: ${missing.length}`);
+    console.log(`Missing/failed: ${missingTable.length}`);
   }
 
   console.log("\n--- Admin page queries ---");
   const pageTests = [
-    ["Overview signups", () => db.from("profiles").select("id, username, display_name, created_at").limit(1)],
-    ["Users page", () => db.from("profiles").select("id, username, display_name, level, xp, coins_balance, wallet_balance, cashout_wallet, is_banned, created_at").limit(1)],
+    ["Overview signups", () => db.from("profiles").select("id, email, full_name, created_at").limit(1)],
+    ["Users page", () => db.from("profiles").select("id, email, full_name, wallet_balance, cashout_wallet, is_suspended, created_at").limit(1)],
     ["Deposits (Spinora)", () => db.from("deposit_requests").select("*, user:profiles!deposit_requests_user_id_fkey(full_name, email)").limit(1)],
     ["Chat (Spinora)", () => db.from("conversations").select("id, user_id, updated_at, user:profiles!conversations_user_id_fkey(full_name, email, is_online, last_seen_at)").limit(1)],
     ["Game loads", () => db.from("game_load_requests").select("id, status").limit(1)],
@@ -154,9 +152,9 @@ async function main() {
     ["CMS blog", () => db.from("blog_posts").select("id, title").limit(1)],
     ["Settings", () => db.from("site_settings").select("key, value").limit(1)],
     ["Achievements", () => db.from("achievements").select("id, title").limit(1)],
-    ["Audit logs", () => db.from("audit_logs").select("id, action, actor:profiles!audit_logs_actor_id_fkey(username)").limit(1)],
-    ["CRM segment", () => db.from("profiles").select("id, username, display_name, level, coins_balance, last_seen_at, is_banned, created_at").limit(1)],
-    ["Payouts", () => db.from("profiles").select("id, display_name, username, cashout_wallet").gt("cashout_wallet", 0).limit(1)],
+    ["Audit logs", () => db.from("audit_logs").select("id, action, actor:profiles!audit_logs_actor_id_fkey(email, full_name)").limit(1)],
+    ["CRM segment", () => db.from("profiles").select("id, email, full_name, last_seen_at, is_suspended, created_at").limit(1)],
+    ["Payouts", () => db.from("profiles").select("id, full_name, email, cashout_wallet").gt("cashout_wallet", 0).limit(1)],
   ];
   for (const [name, fn] of pageTests) {
     const { data, error } = await fn();

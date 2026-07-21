@@ -106,9 +106,57 @@ export async function processAIChatQuery(
     queryLower.includes("human") ||
     queryLower.includes("manager");
 
-  if (apiKey && settings.auto_reply_enabled && (!bestMatch || bestMatch.confidence < 0.92)) {
+  if (apiKey && settings.auto_reply_enabled && (userId || !bestMatch || bestMatch.confidence < 0.92)) {
     try {
-      const systemContent = `${settings.system_prompt}\n${personalityPrompt(settings.personality)}`;
+      let playerContextText = "";
+      if (userId) {
+        const db = createAdminClient();
+        if (db) {
+          try {
+            const [profRes, vipRes, accsRes, loadsRes] = await Promise.all([
+              db.from("profiles").select("display_name, username, wallet_balance, cashout_wallet, level, coins_balance").eq("id", userId).maybeSingle(),
+              db.from("vip_status").select("vip_tiers(name)").eq("user_id", userId).maybeSingle(),
+              db.from("game_accounts").select("game_username, credits_balance, games(name)").eq("user_id", userId),
+              db.from("game_load_requests").select("game_name, amount, load_type, status, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(3),
+            ]);
+
+            if (profRes.data) {
+              const p = profRes.data;
+              const vipTier = (vipRes.data?.vip_tiers as any)?.name ?? "Bronze";
+              playerContextText += `
+[CRITICAL REAL-TIME PLAYER ACCOUNT CONTEXT]
+- Display Name: ${p.display_name || p.username || "Player"}
+- VIP Level: ${vipTier} (Lv. ${p.level || 1})
+- Coins Balance: ${p.coins_balance || 0}
+- Current Deposit Wallet Balance: $${(p.wallet_balance || 0).toFixed(2)}
+- Current Cashout/Withdrawal Wallet Balance: $${(p.cashout_wallet || 0).toFixed(2)}
+`;
+            }
+
+            if (accsRes.data && accsRes.data.length > 0) {
+              playerContextText += "\nPlayer Game Accounts:\n";
+              for (const acc of accsRes.data) {
+                const gName = (acc.games as any)?.name ?? "Unknown Game";
+                playerContextText += `- ${gName}: Username: @${acc.game_username}, Balance: $${(acc.credits_balance || 0).toFixed(2)}\n`;
+              }
+            } else if (accsRes.data) {
+              playerContextText += "\nPlayer Game Accounts: None registered yet.\n";
+            }
+
+            if (loadsRes.data && loadsRes.data.length > 0) {
+              playerContextText += "\nRecent Player Requests (Deposits/Redeems/Accounts):\n";
+              for (const r of loadsRes.data) {
+                const dateStr = new Date(r.created_at).toLocaleDateString();
+                playerContextText += `- [${dateStr}] ${r.load_type.toUpperCase()} request for ${r.game_name} ($${(r.amount || 0).toFixed(2)}) is: ${r.status.toUpperCase()}\n`;
+              }
+            }
+          } catch (err) {
+            console.error("[AIChatBot] Failed to load user context:", err);
+          }
+        }
+      }
+
+      const systemContent = `${settings.system_prompt}\n${personalityPrompt(settings.personality)}${playerContextText ? `\n\n${playerContextText}` : ""}\n\nImportant Instructions: Use the real-time context above if available to answer account-specific questions (like checking balance, usernames, or recent deposits). Keep the tone matched to the personality rules.`;
 
       if (geminiKey && !openRouterKey && !openAiKey) {
         const res = await fetch(

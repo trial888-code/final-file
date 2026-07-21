@@ -10,11 +10,49 @@ export interface AutopilotStatus {
   totalAutopilotPosts: number;
 }
 
-const POSTERS = [
-  "/images/promos/spinora_dealer_ten.jpg",
-  "/images/promos/spinora_model_five.jpg",
-  "/images/promos/spinora_slot_fifteen.jpg",
-  "/images/promos/spinora_gift_three.jpg",
+interface PosterOffer {
+  photo: string;
+  title: string;
+  perks: string[];
+}
+
+const POSTER_OFFERS: PosterOffer[] = [
+  {
+    photo: "/images/promos/spinora_dealer_ten.jpg",
+    title: "👑 <b>DEALER'S EXCLUSIVE — $10.00 FREE PLAY DROP</b>",
+    perks: [
+      "• Get $10.00 Instant Free Play added on your next deposit",
+      "• 24/7 Automated Game Wallet Loads",
+      "• 15-Minute Verified Cashouts"
+    ]
+  },
+  {
+    photo: "/images/promos/spinora_model_five.jpg",
+    title: "🔥 <b>VIP WHEEL REWARDS — $5.00 COIN BLAST</b>",
+    perks: [
+      "• Claim an extra $5.00 Coin Blast to play slots",
+      "• Spin the Daily Wheel for up to $50.00",
+      "• 24/7 Live Agent Support on Telegram"
+    ]
+  },
+  {
+    photo: "/images/promos/spinora_slot_fifteen.jpg",
+    title: "🎰 <b>MEGA SLOT SPECIAL — $15.00 BONUS LOAD</b>",
+    perks: [
+      "• Get a $15.00 Bonus Load on deposits of $20.00 or more",
+      "• Play top slots on Juwa, Orion Stars & Game Vault",
+      "• Instant account setup in under 5 minutes"
+    ]
+  },
+  {
+    photo: "/images/promos/spinora_gift_three.jpg",
+    title: "🎁 <b>DAILY GIFT DROP — $3.00 FREE PLAY</b>",
+    perks: [
+      "• Claim your daily $3.00 Free Play gift drop",
+      "• No bonus codes required — claim directly from dashboard",
+      "• Fast cashouts via Cash App & Venmo"
+    ]
+  }
 ];
 
 export async function getAutopilotStatus(): Promise<AutopilotStatus> {
@@ -62,20 +100,18 @@ export async function runAutopilotDailyPostNow(): Promise<{ ok: boolean; message
     year: "numeric",
   });
 
-  const randomPoster = POSTERS[Math.floor(Math.random() * POSTERS.length)];
-  const photoUrl = `${SITE_URL}${randomPoster}`;
+  const selectedOffer = POSTER_OFFERS[Math.floor(Math.random() * POSTER_OFFERS.length)];
+  const photoUrl = `${SITE_URL}${selectedOffer.photo}`;
 
   const autoCaption = `${settings.template_header}
 
-👑 <b>SPINORA ROYALE VIP — DAILY OFFER</b>
+${selectedOffer.title}
 🗓️ <b>${todayStr}</b>
 
 Daily bonus drop is active on all 8 game platforms!
 
 ✨ <b>Today's perks:</b>
-• 100% Instant Deposit Match
-• 24/7 Automated Game Wallet Loads
-• 15-Minute Verified Cashouts
+${selectedOffer.perks.join("\n")}
 
 👉 <a href="${SITE_URL}/dashboard">Claim Today's Bonus</a>
 

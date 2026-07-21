@@ -225,7 +225,18 @@ type CampaignStat = { value: string; label: string };
 export async function processCampaignBatch(campaignId: string, limit = BATCH_SIZE) {
   const admin = adminDb();
   const resend = getResend();
-  if (!resend) return { sent: 0, failed: 0, remaining: -1 };
+  if (!resend) {
+    await admin
+      .from("newsletter_campaigns")
+      .update({ status: "failed" })
+      .eq("id", campaignId);
+    await admin
+      .from("newsletter_campaign_recipients")
+      .update({ status: "failed", error: "RESEND_API_KEY is not configured in env." })
+      .eq("campaign_id", campaignId)
+      .eq("status", "pending");
+    return { sent: 0, failed: 0, remaining: -1 };
+  }
 
   const { data: campaign } = await admin
     .from("newsletter_campaigns")

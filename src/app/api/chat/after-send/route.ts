@@ -110,10 +110,20 @@ export async function POST(request: Request) {
           const db = adminClient ?? supabase;
 
           if (aiResult.shouldEscalateToHuman && chatSettings.telegram_escalation_enabled && isTelegramConfigured()) {
+            const { data: profile } = await db
+              .from("profiles")
+              .select("display_name, username, email")
+              .eq("id", user.id)
+              .maybeSingle();
+
+            const displayName = profile?.display_name || profile?.username || "Player";
+            const email = profile?.email || "No Email";
+
             await sendTelegramMessage(
               [
                 "🚨 <b>CHAT ESCALATION</b>",
-                `<b>User:</b> ${escapeTelegramHtml(user.id)}`,
+                `<b>Player:</b> ${escapeTelegramHtml(displayName)}`,
+                `<b>Email:</b> ${escapeTelegramHtml(email)}`,
                 `<b>Message:</b> ${escapeTelegramHtml(content.slice(0, 500))}`,
                 `<i>${SITE_URL}/admin/chat</i>`,
               ].join("\n")

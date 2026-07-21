@@ -14,7 +14,7 @@ export type TelegramPromoRow = {
 };
 
 export function formatPromoCaption(text: string, link?: string | null): string {
-  const body = escapeTelegramHtml(text.trim());
+  const body = text.trim();
   const url = link?.trim();
   if (!url) return body;
   const safeUrl = url.replace(/"/g, "%22");

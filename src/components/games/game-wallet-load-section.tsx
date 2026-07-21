@@ -76,6 +76,7 @@ export function GameWalletLoadSection({
   const [customUsername, setCustomUsername] = useState("");
   const [customPassword, setCustomPassword] = useState("");
   const [recentLoads, setRecentLoads] = useState<GameLoadRequest[]>([]);
+  const [lastVerifiedBalance, setLastVerifiedBalance] = useState<number | null>(null);
   const [requesterName, setRequesterName] = useState<string | null>(null);
   const [requesterEmail, setRequesterEmail] = useState<string | null>(null);
   const [savedAccount, setSavedAccount] = useState<{
@@ -134,6 +135,25 @@ export function GameWalletLoadSection({
   const refreshLoads = useCallback(async () => {
     const loads = (await getMyGameLoads(game.slug)) as GameLoadRequest[];
     setRecentLoads(loads);
+
+    // Fetch last completed balance check to prevent pagination truncation bug
+    if (supabase) {
+      const { data: lastCheck } = await supabase
+        .from("game_load_requests")
+        .select("amount")
+        .eq("game_slug", game.slug)
+        .eq("load_type", "check_balance")
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastCheck) {
+        setLastVerifiedBalance(Number(lastCheck.amount));
+      } else {
+        setLastVerifiedBalance(null);
+      }
+    }
 
     const pendingLoads = loads.filter(
       (l) =>
@@ -226,10 +246,12 @@ export function GameWalletLoadSection({
         game_username: completedCreate.game_username,
         game_password: completedCreate.game_password,
       });
+    } else {
+      void refreshAccount();
     }
 
     return loads;
-  }, [game.slug, refreshWallet, refreshAccount]);
+  }, [game.slug, refreshWallet, refreshAccount, supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +324,33 @@ export function GameWalletLoadSection({
   }, [supabase]);
 
   useEffect(() => {
+    if (!supabase) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || cancelled) return;
+      channel = supabase
+        .channel(`game-load-requests-${user.id}-${game.slug}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "game_load_requests", filter: `user_id=eq.${user.id}` },
+          () => {
+            void refreshAccount();
+            void refreshLoads();
+            void refreshWallet();
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [supabase, game.slug, refreshAccount, refreshLoads, refreshWallet]);
+
+  useEffect(() => {
     if (fundsTab === "redeem") void refreshWallet();
   }, [fundsTab, refreshWallet]);
 
@@ -370,10 +419,7 @@ export function GameWalletLoadSection({
       })()
     : previewStem;
 
-  const lastBalanceCheck = recentLoads.find(
-    (l) => l.load_type === "check_balance" && l.status === "completed"
-  );
-  const lastKnownBalance = lastBalanceCheck ? Number(lastBalanceCheck.amount) : null;
+  const lastKnownBalance = lastVerifiedBalance;
   const parsedRedeemAmount = parseFloat(redeemAmount) || 0;
 
   const activeRedeemRollover = depositRollover;

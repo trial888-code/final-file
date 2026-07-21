@@ -650,10 +650,29 @@ body.lobby-mode .glass {
 /* Prize wheel — Casinoze-style */
 .spin-page-bg {
   background:
-    radial-gradient(ellipse 80% 60% at 20% 30%, rgba(88, 28, 135, 0.25) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 50% at 80% 70%, rgba(49, 46, 129, 0.2) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(20, 10, 40, 0.8) 0%, transparent 70%),
-    linear-gradient(180deg, #0a0a14 0%, #0d0818 50%, #0a0a14 100%);
+    radial-gradient(ellipse 80% 60% at 20% 30%, rgba(251, 191, 36, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 80% 70%, rgba(124, 58, 237, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(15, 5, 30, 0.9) 0%, transparent 70%),
+    linear-gradient(180deg, #020208 0%, #080312 40%, #0c051a 75%, #020208 100%);
+  position: relative;
+}
+
+.spin-page-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, #ffffff 100%, transparent),
+    radial-gradient(1.5px 1.5px at 28% 44%, rgba(255, 255, 255, 0.8) 100%, transparent),
+    radial-gradient(1px 1px at 42% 12%, #fbbf24 100%, transparent),
+    radial-gradient(2px 2px at 66% 68%, rgba(251, 191, 36, 0.75) 100%, transparent),
+    radial-gradient(1.2px 1.2px at 84% 38%, #ffffff 100%, transparent),
+    radial-gradient(1.5px 1.5px at 89% 78%, rgba(168, 85, 247, 0.6) 100%, transparent),
+    radial-gradient(1px 1px at 5% 55%, #ffffff 100%, transparent),
+    radial-gradient(2px 2px at 95% 22%, rgba(255, 255, 255, 0.5) 100%, transparent);
+  background-size: cover;
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .prize-wheel-stage {

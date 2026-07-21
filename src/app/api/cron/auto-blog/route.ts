@@ -26,6 +26,23 @@ async function handleCron(request: Request) {
   }
 
   const url = new URL(request.url);
+  const force = url.searchParams.get("force") === "true";
+
+  if (!force && blogSettings.last_generated_at && blogSettings.posting_frequency_hours) {
+    const lastGenTime = new Date(blogSettings.last_generated_at).getTime();
+    if (!isNaN(lastGenTime) && lastGenTime > 0) {
+      const elapsedMs = Date.now() - lastGenTime;
+      const requiredMs = blogSettings.posting_frequency_hours * 60 * 60 * 1000;
+      if (elapsedMs < requiredMs) {
+        const remainingMinutes = Math.ceil((requiredMs - elapsedMs) / (60 * 1000));
+        return NextResponse.json({
+          skipped: true,
+          reason: `Posting frequency limit not reached. Last generated: ${blogSettings.last_generated_at}. Posting frequency: every ${blogSettings.posting_frequency_hours} hours. Remaining: ${remainingMinutes} minutes. Pass ?force=true to override.`,
+        });
+      }
+    }
+  }
+
   const topicParam = url.searchParams.get("topic") || undefined;
   const keywordsParam = url.searchParams.get("keywords")
     ? url.searchParams.get("keywords")!.split(",")
@@ -54,6 +71,13 @@ async function handleCron(request: Request) {
         header: telegramSettings.template_header,
         footer: telegramSettings.template_footer,
       });
+      if (telegramResult.ok && result.postId) {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const db = createAdminClient();
+        if (db) {
+          await db.from("blog_posts").update({ telegram_sent: true }).eq("id", result.postId);
+        }
+      }
     } catch (err) {
       telegramResult = {
         ok: false,

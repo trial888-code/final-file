@@ -1,21 +1,21 @@
 import { GAMES, filterHomeGames, type HomeGameTab } from "@/lib/games";
 import type { LobbyMenuId } from "@/components/home/lobby/lobby-sidebar";
 
-const LOBBY_CATEGORY_MAP: Partial<Record<LobbyMenuId, string[]>> = {
-  slots: ["Slots"],
-  fish: ["Fish Game"],
-  table: ["Casino", "Arcade", "Vault", "All-In-One"],
-};
-
 export function filterLobbyGames(menu: LobbyMenuId, search: string) {
-  let list = filterHomeGames("trending" as HomeGameTab, search);
+  let list = filterHomeGames("all" as HomeGameTab, search);
 
-  const categories = LOBBY_CATEGORY_MAP[menu];
-  if (categories) {
-    list = list.filter((g) => categories.includes(g.category));
+  if (menu === "slots") {
+    list = list.filter((g) => g.category === "Slots");
+  } else if (menu === "fish") {
+    list = list.filter((g) => g.category === "Fish Game");
+  } else if (menu === "table") {
+    list = list.filter((g) => g.category === "Table Games");
+  } else if (menu === "live") {
+    list = list.filter((g) => g.slug === "juwa" || g.slug === "vegas-sweeps" || g.slug === "game-vault");
   }
 
   return list;
 }
 
 export { GAMES };
+

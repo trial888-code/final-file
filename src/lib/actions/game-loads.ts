@@ -731,7 +731,7 @@ export async function getMyGameLoads(gameSlug?: string) {
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(20);
 
   if (gameSlug) query = query.eq("game_slug", gameSlug);
 
@@ -748,13 +748,12 @@ export async function getMyGameAccount(gameSlug: string) {
 
   const { data } = await supabase
     .from("game_load_requests")
-    .select("game_username, game_password, status, completed_at")
+    .select("game_username, game_password, status, completed_at, created_at")
     .eq("user_id", user.id)
     .eq("game_slug", gameSlug)
     .eq("status", "completed")
-    .in("load_type", ["create_account", "new_account"])
     .not("game_username", "is", null)
-    .order("completed_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

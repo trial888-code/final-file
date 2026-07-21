@@ -124,12 +124,16 @@ export async function updateDepositStatus(
     .single();
   if (profile?.role !== "admin") return { error: "Unauthorized" };
 
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from("deposit_requests")
     .select("user_id, game_name, payment_method, amount, status, wallet_credited")
     .eq("id", depositId)
     .single();
 
+  if (selectError) {
+    console.error("Select deposit request error:", selectError);
+    return { error: `Query error: ${selectError.message}` };
+  }
   if (!existing) return { error: "Deposit request not found" };
 
   if (status === "completed") {

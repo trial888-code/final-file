@@ -16,6 +16,10 @@ export async function updateSession(request: NextRequest) {
     .getAll()
     .some((c) => c.name.includes("-auth-token") && c.value);
 
+  if (!isProtected && !isAuth) {
+    return NextResponse.next({ request });
+  }
+
   if (isProtected && !hasSupabaseSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

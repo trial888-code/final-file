@@ -105,7 +105,8 @@ export async function listGeoPagesAction(): Promise<{
     name: string;
     slug: string;
     abbr: string;
-    cities: Array<{ id: string; name: string; slug: string }>;
+    is_active: boolean;
+    cities: Array<{ id: string; name: string; slug: string; is_active: boolean }>;
   }>;
   error?: string;
 }> {
@@ -115,8 +116,7 @@ export async function listGeoPagesAction(): Promise<{
   const db = adminDb();
   const { data: states, error } = await db
     .from("geo_states")
-    .select("id, name, slug, abbr, geo_cities(id, name, slug)")
-    .eq("is_active", true)
+    .select("id, name, slug, abbr, is_active, geo_cities(id, name, slug, is_active)")
     .order("sort_order");
 
   if (error) return { ok: false, error: error.message };
@@ -128,8 +128,9 @@ export async function listGeoPagesAction(): Promise<{
       name: s.name,
       slug: s.slug,
       abbr: s.abbr,
-      cities: ((s as { geo_cities?: Array<{ id: string; name: string; slug: string }> }).geo_cities ?? []).map(
-        (c) => ({ id: c.id, name: c.name, slug: c.slug })
+      is_active: s.is_active,
+      cities: ((s as { geo_cities?: Array<{ id: string; name: string; slug: string; is_active: boolean }> }).geo_cities ?? []).map(
+        (c) => ({ id: c.id, name: c.name, slug: c.slug, is_active: c.is_active })
       ),
     })),
   };

@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { LobbyAccountSidebar } from "@/components/home/lobby/lobby-account-sidebar";
 import { CompleteProfilePrompt } from "@/components/auth/complete-profile-prompt";

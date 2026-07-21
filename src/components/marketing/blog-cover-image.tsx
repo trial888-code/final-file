@@ -35,21 +35,38 @@ export function BlogCoverImage({
     );
   }
 
+  const isLocalGame = src.startsWith("/games/");
+
   return (
-    <Image
-      src={src}
-      alt={alt}
-      fill
-      sizes={sizes}
-      priority={priority}
-      unoptimized={isRemoteBlogCover(src)}
-      className={cn(
-        isPhoto || variant === "hero"
-          ? "object-cover object-center transition-transform duration-500 group-hover:scale-105"
-          : "object-contain object-center p-6",
-        className
+    <div className="relative h-full w-full overflow-hidden bg-[#0c0c0e]">
+      {/* Ambient background glow for game poster art */}
+      {isLocalGame && (
+        <Image
+          src={src}
+          alt=""
+          fill
+          unoptimized
+          aria-hidden
+          className="object-cover object-center blur-xl opacity-60 scale-125 pointer-events-none"
+        />
       )}
-      onError={() => setFailed(true)}
-    />
+      {/* Crisp foreground poster */}
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        priority={priority}
+        unoptimized={isRemoteBlogCover(src)}
+        className={cn(
+          isLocalGame
+            ? "object-contain object-center p-2.5 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] transition-transform duration-500 group-hover:scale-105"
+            : "object-cover object-center transition-transform duration-500 group-hover:scale-105",
+          className
+        )}
+        onError={() => setFailed(true)}
+      />
+    </div>
   );
+
 }

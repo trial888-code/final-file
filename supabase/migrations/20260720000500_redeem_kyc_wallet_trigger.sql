@@ -23,7 +23,8 @@ BEGIN
     OR OLD.cashout_wallet IS DISTINCT FROM NEW.cashout_wallet
     OR OLD.bonus_redeem_wallet IS DISTINCT FROM NEW.bonus_redeem_wallet
   ) THEN
-    IF current_setting('app.wallet_update', true) = 'true' THEN
+    IF current_setting('app.wallet_update', true) = 'true'
+       OR current_setting('request.jwt.claim.role', true) = 'service_role' THEN
       RETURN NEW;
     END IF;
     IF auth.uid() IS NOT NULL AND EXISTS (

@@ -25,27 +25,30 @@ export async function POST(req: Request) {
 
         if (userId && userId !== "guest") {
           // Increment player wallet balance atomically in Supabase
-          const { data: wallet } = await admin
-            .from("wallets")
-            .select("balance")
-            .eq("user_id", userId)
+          const { data: profile } = await admin
+            .from("profiles")
+            .select("wallet_balance")
+            .eq("id", userId)
             .maybeSingle();
 
-          const currentBalance = Number(wallet?.balance || 0);
+          const currentBalance = Number(profile?.wallet_balance || 0);
           const depositAmount = Number(price_amount || 0);
           const newBalance = currentBalance + depositAmount;
 
           await admin
-            .from("wallets")
-            .update({ balance: newBalance, updated_at: new Date().toISOString() })
-            .eq("user_id", userId);
+            .from("profiles")
+            .update({ wallet_balance: newBalance })
+            .eq("id", userId);
 
-          // Log transaction
-          await admin.from("wallet_audit_logs").insert({
+          // Log transaction in wallet_transactions
+          await admin.from("wallet_transactions").insert({
             user_id: userId,
-            action: "nowpayments_deposit_confirmed",
             amount: depositAmount,
-            metadata: { order_id, payment_status, payload },
+            wallet_type: "current",
+            transaction_type: "credit",
+            source: "nowpayments_deposit",
+            description: `NowPayments deposit of $${depositAmount.toFixed(2)}`,
+            created_by: null,
           });
         }
       }

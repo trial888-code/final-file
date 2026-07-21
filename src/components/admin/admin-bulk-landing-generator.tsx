@@ -18,7 +18,8 @@ type GeoStateRow = {
   name: string;
   slug: string;
   abbr: string;
-  cities: Array<{ id: string; name: string; slug: string }>;
+  is_active: boolean;
+  cities: Array<{ id: string; name: string; slug: string; is_active: boolean }>;
 };
 
 export function AdminBulkLandingGenerator() {
@@ -138,8 +139,13 @@ export function AdminBulkLandingGenerator() {
             {statesList.map((state) => (
               <div key={state.id} className="p-3 rounded-2xl border border-border/60 bg-zinc-900/80 space-y-2.5">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <span className="font-bold text-foreground text-sm">
+                  <span className="font-bold text-foreground text-sm flex items-center gap-1.5">
                     {state.name} ({state.abbr})
+                    {!state.is_active && (
+                      <Badge variant="outline" className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-[9px] px-1 py-0 h-4 leading-none">
+                        Inactive
+                      </Badge>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Link
@@ -168,6 +174,11 @@ export function AdminBulkLandingGenerator() {
                     >
                       <span className="font-medium text-zinc-300 flex items-center gap-1">
                         <MapPin className="h-3 w-3 text-amber-400 shrink-0" /> {city.name}
+                        {!city.is_active && (
+                          <span className="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded border border-rose-500/20 ml-1">
+                            Inactive
+                          </span>
+                        )}
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Link

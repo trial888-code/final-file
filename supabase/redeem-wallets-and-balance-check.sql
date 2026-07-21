@@ -35,7 +35,8 @@ BEGIN
       OR OLD.bonus_wallet IS DISTINCT FROM NEW.bonus_wallet
       OR OLD.cashout_wallet IS DISTINCT FROM NEW.cashout_wallet
       OR OLD.bonus_redeem_wallet IS DISTINCT FROM NEW.bonus_redeem_wallet) THEN
-    IF current_setting('app.wallet_update', true) = 'true' THEN
+    IF current_setting('app.wallet_update', true) = 'true'
+       OR current_setting('request.jwt.claim.role', true) = 'service_role' THEN
       RETURN NEW;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin') THEN

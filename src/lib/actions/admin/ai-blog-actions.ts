@@ -28,6 +28,13 @@ export async function generateBlogArticleAction(topic?: string, keywords?: strin
         footer: telegramSettings.template_footer,
       });
       telegramOk = tg.ok;
+      if (tg.ok && result.postId) {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const db = createAdminClient();
+        if (db) {
+          await db.from("blog_posts").update({ telegram_sent: true }).eq("id", result.postId);
+        }
+      }
     }
 
     revalidatePath("/admin/ai-blog");
