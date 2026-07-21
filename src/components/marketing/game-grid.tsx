@@ -26,7 +26,7 @@ export async function MarketingGameGrid({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
         {games.map((game, index) => (
-          <GameCard key={game.id} game={game} eager={index < 8} />
+          <GameCard key={game.slug} game={game} eager={index < 8} />
         ))}
       </div>
     </section>

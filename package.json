@@ -11,7 +11,10 @@
     "bots:standalone": "cmd /c \"cd workers && start-all-bots.bat\"",
     "lint": "next lint",
     "deploy": "vercel --prod --yes",
-    "deploy:preview": "vercel --yes"
+    "deploy:preview": "vercel --yes",
+    "setup:extract-sql": "node scripts/extract-section-a.mjs",
+    "setup:verify": "node scripts/verify-setup.mjs",
+    "setup:sql": "node scripts/run-section-a.mjs"
   },
   "dependencies": {
     "@eslint/eslintrc": "^3.3.5",
@@ -70,6 +73,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.7",
+    "pg": "^8.22.0",
     "postcss": "^8.5.15",
     "sharp": "^0.35.1",
     "tailwindcss": "^4.3.0",

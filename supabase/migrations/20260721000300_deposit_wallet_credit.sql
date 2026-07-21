@@ -1,8 +1,13 @@
 -- Credit Total Deposit wallet when admin confirms a deposit request.
 -- Run once in Supabase SQL Editor after deposit-requests.sql and wallets.sql
 
-ALTER TABLE public.deposit_requests
-  ADD COLUMN IF NOT EXISTS wallet_credited BOOLEAN NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  IF to_regclass('public.deposit_requests') IS NOT NULL THEN
+    ALTER TABLE public.deposit_requests
+      ADD COLUMN IF NOT EXISTS wallet_credited BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.complete_deposit_request(
   p_deposit_id UUID,

@@ -1,16 +1,17 @@
-import { GAMES, type Game } from "@/lib/games";
+import { GAMES, type Game, dedupeGamesForDisplay, canonicalGameSlug, getGameBySlug } from "@/lib/games";
 import type { MarketingGame } from "@/lib/data/marketing";
 
 /** Map CMS / marketing catalog rows to home GameCard shape. */
 export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
-  if (!catalog.length) return GAMES;
+  if (!catalog.length) return dedupeGamesForDisplay(GAMES);
 
-  return catalog.map((g) => {
-    const local = GAMES.find((x) => x.slug === g.slug);
+  const mapped = catalog.map((g) => {
+    const local = GAMES.find((x) => canonicalGameSlug(x.slug) === canonicalGameSlug(g.slug));
+    const slug = local?.slug ?? g.slug;
     return {
-      id: g.id,
-      name: g.name,
-      slug: g.slug,
+      id: local?.id ?? g.id,
+      name: local?.name ?? g.name,
+      slug,
       image: g.image_url ?? local?.image ?? "/games/game-vault.webp",
       provider: local?.provider ?? g.name,
       category: local?.category ?? "Arcade",
@@ -24,4 +25,27 @@ export function marketingGamesToCards(catalog: MarketingGame[]): Game[] {
       upcoming: local?.upcoming,
     };
   });
+
+  return dedupeGamesForDisplay(mapped);
+}
+
+/** Static catalog + DB-only games — one card per title, static metadata wins. */
+export function buildLobbyCatalog(dbCatalog: MarketingGame[] = []): Game[] {
+  const bySlug = new Map<string, Game>();
+
+  for (const game of GAMES) {
+    bySlug.set(canonicalGameSlug(game.slug), game);
+  }
+
+  for (const game of marketingGamesToCards(dbCatalog)) {
+    const key = canonicalGameSlug(game.slug);
+    if (!bySlug.has(key)) bySlug.set(key, game);
+  }
+
+  return dedupeGamesForDisplay([...bySlug.values()]);
+}
+
+/** Prefer canonical static display name for grid labels. */
+export function gameDisplayName(game: Game): string {
+  return getGameBySlug(game.slug)?.name ?? game.name;
 }

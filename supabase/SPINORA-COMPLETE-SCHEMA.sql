@@ -870,8 +870,12 @@ GRANT EXECUTE ON FUNCTION public.credit_redeem_completion(UUID, NUMERIC, TEXT) T
 -- Migration: 20260722000100_fix_game_accounts_credentials.sql
 -- Adds game_password support to game_accounts and updates complete_game_load RPC
 
-ALTER TABLE public.game_accounts
-  ADD COLUMN IF NOT EXISTS game_password TEXT;
+DO $$
+BEGIN
+  IF to_regclass('public.game_accounts') IS NOT NULL THEN
+    ALTER TABLE public.game_accounts ADD COLUMN IF NOT EXISTS game_password TEXT;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.complete_game_load(
   p_request_id UUID,
@@ -1032,8 +1036,13 @@ GRANT EXECUTE ON FUNCTION public.complete_game_load(UUID, BOOLEAN, TEXT, TEXT, T
 -- Credit Total Deposit wallet when admin confirms a deposit request.
 -- Run once in Supabase SQL Editor after deposit-requests.sql and wallets.sql
 
-ALTER TABLE public.deposit_requests
-  ADD COLUMN IF NOT EXISTS wallet_credited BOOLEAN NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  IF to_regclass('public.deposit_requests') IS NOT NULL THEN
+    ALTER TABLE public.deposit_requests
+      ADD COLUMN IF NOT EXISTS wallet_credited BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.complete_deposit_request(
   p_deposit_id UUID,
@@ -1120,11 +1129,15 @@ GRANT EXECUTE ON FUNCTION public.complete_deposit_request(UUID, NUMERIC, TEXT) T
 -- Spinora · 0200 · Add telegram_sent status tracking to blog_posts
 -- ============================================================================
 
-ALTER TABLE public.blog_posts 
-  ADD COLUMN IF NOT EXISTS telegram_sent boolean NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  IF to_regclass('public.blog_posts') IS NOT NULL THEN
+    ALTER TABLE public.blog_posts
+      ADD COLUMN IF NOT EXISTS telegram_sent boolean NOT NULL DEFAULT false;
 
--- Mark all existing posts as sent so the cron doesn't broadcast historical posts
-UPDATE public.blog_posts SET telegram_sent = true;
+    UPDATE public.blog_posts SET telegram_sent = true;
+  END IF;
+END $$;
 
 -- ============================================================================
 -- SECTION A END

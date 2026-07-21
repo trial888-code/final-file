@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -12,7 +13,9 @@ import { PublicReviewsSection } from "@/components/home/public-reviews-section";
 import {
   filterGames,
   filterHomeGames,
+  dedupeGamesForDisplay,
   GAMES,
+  type Game,
   type GameTab,
   type HomeGameTab,
 } from "@/lib/games";
@@ -86,6 +89,10 @@ const MAIN_TABS: { id: HomeGameTab; label: string }[] = [
 interface HomeLandingShellProps {
   /** Server-resolved login state — sidebar account links paint immediately. */
   initialLoggedIn?: boolean;
+  /** Slugs the user already has accounts for — hidden from lobby browse grid. */
+  linkedGameSlugs?: string[];
+  /** Deduped game catalog from server (static + DB, one card per title). */
+  lobbyCatalog?: Game[];
   /** Server-rendered hero for fast LCP on mobile */
   hero?: ReactNode;
   /** Optional CMS-driven sections (FAQs, reviews, guides) from the database */
@@ -94,6 +101,8 @@ interface HomeLandingShellProps {
 
 export function HomeLandingShell({
   initialLoggedIn = false,
+  linkedGameSlugs = [],
+  lobbyCatalog = GAMES,
   hero,
   cmsSections,
 }: HomeLandingShellProps) {
@@ -138,11 +147,21 @@ export function HomeLandingShell({
     gamesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const displayGames = loggedIn
-    ? filterLobbyGames(lobbyMenu, search)
-    : useSidebarFilter
-      ? filterGames(sidebarTab, search)
-      : filterHomeGames(mainTab, search);
+  const displayGames = dedupeGamesForDisplay(
+    loggedIn
+      ? filterLobbyGames(lobbyMenu, search, lobbyCatalog).filter(
+          (g) => !linkedGameSlugs.includes(g.slug)
+        )
+      : useSidebarFilter
+        ? filterGames(sidebarTab, search)
+        : filterHomeGames(mainTab, search)
+  );
+
+  const linkedGames = loggedIn
+    ? linkedGameSlugs
+        .map((slug) => lobbyCatalog.find((g) => g.slug === slug))
+        .filter((g): g is NonNullable<typeof g> => Boolean(g))
+    : [];
 
   if (!authReady) {
     return (
@@ -181,6 +200,13 @@ export function HomeLandingShell({
         <section ref={gamesRef} id="games" className="scroll-mt-2">
           {displayGames.length > 0 ? (
             <LobbyGameGrid games={displayGames} />
+          ) : linkedGames.length > 0 ? (
+            <div className="rounded-xl border border-amber-500/20 bg-purple-950/30 p-6 text-center">
+              <p className="text-sm text-purple-200/80">You have accounts for all games shown here.</p>
+              <Link href="/dashboard/games" className="mt-2 inline-block text-sm font-semibold text-amber-400 hover:text-amber-300">
+                Open My Games →
+              </Link>
+            </div>
           ) : (
             <p className="text-center py-12 text-purple-300/60 text-sm">No games found.</p>
           )}
@@ -268,7 +294,7 @@ export function HomeLandingShell({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {displayGames.length > 0 ? (
               displayGames.map((game, index) => (
-                <GameCard key={game.id} game={game} eager={index < 4} />
+                <GameCard key={game.slug} game={game} eager={index < 4} />
               ))
             ) : (
               <p className="col-span-full text-center py-12 text-muted-foreground">

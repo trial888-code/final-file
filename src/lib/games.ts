@@ -430,6 +430,76 @@ export function getGameBySlug(slug: string): Game | undefined {
   return GAMES.find((g) => g.slug === slug);
 }
 
+/** Keep first occurrence per slug — prevents duplicate cards in grids. */
+export function dedupeGamesBySlug<T extends { slug: string }>(games: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const game of games) {
+    const key = canonicalGameSlug(game.slug);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(game);
+  }
+  return out;
+}
+
+/** Normalize slug aliases (DB vs static catalog). */
+export function canonicalGameSlug(slug: string): string {
+  const s = slug.trim().toLowerCase().replace(/_/g, "-");
+  const aliases: Record<string, string> = {
+    cashmachine: "cash-machine",
+    "cash-frenzy": "cash-frenzy",
+    cashfrenzy: "cash-frenzy",
+    "game-vault": "game-vault",
+    gamevault: "game-vault",
+    "mr-all-in-one": "mr-all-in-one",
+    mrallinone: "mr-all-in-one",
+    vegas: "vegas-sweeps",
+    "vegas-sweeps": "vegas-sweeps",
+    firekirin: "fire-kirin",
+    "fire-kirin": "fire-kirin",
+    pandamaster: "panda-master",
+    "panda-master": "panda-master",
+    ultrapanda: "ultrapanda",
+    gameroom: "gameroom",
+    mafia: "mafia",
+  };
+  return aliases[s] ?? s;
+}
+
+function normalizeGameName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Dedupe by slug, image path, and normalized name — last line of defense for grids. */
+export function dedupeGamesForDisplay(games: Game[]): Game[] {
+  const seenSlug = new Set<string>();
+  const seenImage = new Set<string>();
+  const seenName = new Set<string>();
+  const out: Game[] = [];
+
+  for (const game of games) {
+    const slugKey = canonicalGameSlug(game.slug);
+    const imageKey = game.image.trim().toLowerCase();
+    const nameKey = normalizeGameName(game.name);
+
+    if (
+      (slugKey && seenSlug.has(slugKey)) ||
+      (imageKey && seenImage.has(imageKey)) ||
+      (nameKey && seenName.has(nameKey))
+    ) {
+      continue;
+    }
+
+    if (slugKey) seenSlug.add(slugKey);
+    if (imageKey) seenImage.add(imageKey);
+    if (nameKey) seenName.add(nameKey);
+    out.push(game);
+  }
+
+  return out;
+}
+
 export function getOtherGames(slug: string, limit = 6): Game[] {
   return GAMES.filter((g) => g.slug !== slug && !g.upcoming)
     .sort((a, b) => b.players - a.players)
@@ -466,7 +536,7 @@ export function filterGames(tab: GameTab, search: string): Game[] {
     );
   }
 
-  return list;
+  return dedupeGamesForDisplay(list);
 }
 
 export function filterHomeGames(tab: HomeGameTab, search: string): Game[] {
@@ -482,7 +552,7 @@ export function filterHomeGames(tab: HomeGameTab, search: string): Game[] {
           g.bio.toLowerCase().includes(q)
       );
     }
-    return list;
+    return dedupeGamesForDisplay(list);
   }
   return filterGames("all", search);
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Game } from "@/lib/games";
+import { gameDisplayName } from "@/lib/games-marketing";
 import { useInView } from "@/lib/hooks/use-in-view";
 import { cn } from "@/lib/utils";
 import { TiltCard } from "@/components/shared/tilt-card";
@@ -23,13 +24,14 @@ export function CompactGameCard({
   const { ref, inView } = useInView("800px", eager);
   const showImage = eager || inView;
   const href = `/games/${game.slug}`;
+  const label = gameDisplayName(game);
 
   const inner = (
     <>
       {showImage ? (
         <Image
           src={game.image}
-          alt={game.name}
+          alt={label}
           fill
           priority={eager}
           loading={eager ? "eager" : "lazy"}
@@ -39,7 +41,7 @@ export function CompactGameCard({
           )}
           sizes={
             variant === "lobby"
-              ? "(max-width: 1024px) 16vw, 140px"
+              ? "(max-width: 480px) 45vw, (max-width: 768px) 30vw, (max-width: 1024px) 16vw, 140px"
               : variant === "slider"
                 ? "148px"
                 : "(max-width: 640px) 45vw, (max-width: 1024px) 25vw, 200px"
@@ -52,7 +54,7 @@ export function CompactGameCard({
       {variant !== "lobby" && (
         <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-2.5 pt-10 text-center bg-gradient-to-t from-black/90 via-black/60 to-transparent">
           <p className="text-[11px] sm:text-xs font-bold text-white leading-tight line-clamp-2">
-            {game.name}
+            {label}
           </p>
           <p className="text-[9px] sm:text-[10px] text-amber-400 font-bold mt-0.5 group-hover:text-amber-300 transition-colors">
             {game.upcoming ? "Coming Soon" : "⚡ 1-Click Load"}
@@ -89,11 +91,11 @@ export function CompactGameCard({
       <Link
         href={href}
         className="absolute inset-0 z-20"
-        aria-label={game.upcoming ? `${game.name} — coming soon` : `View ${game.name}`}
+        aria-label={game.upcoming ? `${label} — coming soon` : `View ${label}`}
         onPointerDown={variant === "slider" ? (e) => e.stopPropagation() : undefined}
         draggable={false}
       >
-        <span className="sr-only">{game.name}</span>
+        <span className="sr-only">{label}</span>
       </Link>
       {inner}
     </div>
@@ -102,6 +104,11 @@ export function CompactGameCard({
   return (
     <div ref={ref} className={variant === "lobby" ? "lobby-game-cell" : "w-full"}>
       {variant === "lobby" ? card : <TiltCard>{card}</TiltCard>}
+      {variant === "lobby" && (
+        <p className="mt-1 truncate px-0.5 text-center text-[10px] font-semibold text-purple-200/80 sm:text-[11px]">
+          {label}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,8 +1,12 @@
 -- Migration: 20260722000100_fix_game_accounts_credentials.sql
 -- Adds game_password support to game_accounts and updates complete_game_load RPC
 
-ALTER TABLE public.game_accounts
-  ADD COLUMN IF NOT EXISTS game_password TEXT;
+DO $$
+BEGIN
+  IF to_regclass('public.game_accounts') IS NOT NULL THEN
+    ALTER TABLE public.game_accounts ADD COLUMN IF NOT EXISTS game_password TEXT;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.complete_game_load(
   p_request_id UUID,

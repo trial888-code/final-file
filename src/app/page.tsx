@@ -6,16 +6,24 @@ import { PlayByStateSection } from "@/components/marketing/play-by-state-section
 import { HomeFaq } from "@/components/spinora/home-faq";
 import { HomeGuides } from "@/components/spinora/home-guides";
 import { HomeReviews } from "@/components/spinora/home-reviews";
-import { getFaqs, getHomepageReviews, getLatestBlogPosts } from "@/lib/data/marketing";
+import { getLinkedGameSlugs } from "@/lib/data/dashboard";
+import { getFaqs, getHomepageReviews, getLatestBlogPosts, getGames } from "@/lib/data/marketing";
+import { buildLobbyCatalog } from "@/lib/games-marketing";
+import { getAuthUser } from "@/lib/supabase/session";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [faqs, reviews, guides] = await Promise.all([
+  const user = await getAuthUser();
+  const [faqs, reviews, guides, linkedGameSlugs, dbGames] = await Promise.all([
     getFaqs(),
     getHomepageReviews(),
     getLatestBlogPosts(),
+    user ? getLinkedGameSlugs(user.id) : Promise.resolve([] as string[]),
+    getGames(),
   ]);
+
+  const lobbyCatalog = buildLobbyCatalog(dbGames);
 
   const cmsSections = (
     <div className="space-y-10 py-4">
@@ -31,6 +39,12 @@ export default async function HomePage() {
   );
 
   return (
-    <HomeLandingShell hero={<HeroStatic />} cmsSections={cmsSections} />
+    <HomeLandingShell
+      hero={<HeroStatic />}
+      cmsSections={cmsSections}
+      linkedGameSlugs={linkedGameSlugs}
+      lobbyCatalog={lobbyCatalog}
+      initialLoggedIn={Boolean(user)}
+    />
   );
 }

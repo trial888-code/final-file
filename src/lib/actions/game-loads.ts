@@ -206,6 +206,9 @@ export async function requestGameAccountCreate(input: {
 
     if (!error && requestId) {
       revalidatePath(`/games/${input.gameSlug}`);
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/games");
+      revalidatePath("/");
       revalidatePath("/admin/game-loads");
       return { success: true, requestId: requestId as string };
     }
@@ -241,6 +244,7 @@ export async function requestGameAccountCreate(input: {
 
     revalidatePath(`/games/${input.gameSlug}`);
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/games");
     revalidatePath("/admin/game-loads");
 
     return { success: true, requestId: directInsert?.id || "" };
@@ -430,6 +434,7 @@ export async function requestGameLoad(input: {
 
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/dashboard");
+    revalidatePath("/dashboard/games");
   revalidatePath("/admin/game-loads");
 
   await notifyAdminOfWalletActivity({
@@ -585,6 +590,7 @@ export async function requestGameRedeem(input: {
 
   revalidatePath(`/games/${input.gameSlug}`);
   revalidatePath("/dashboard");
+    revalidatePath("/dashboard/games");
   revalidatePath("/admin/game-loads");
   revalidatePath("/admin/payouts");
   revalidatePath("/dashboard/wallet");
@@ -745,6 +751,31 @@ export async function getMyGameAccount(gameSlug: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
+
+  const { data: game } = await supabase
+    .from("games")
+    .select("id")
+    .eq("slug", gameSlug)
+    .maybeSingle();
+
+  if (game) {
+    const { data: account } = await supabase
+      .from("game_accounts")
+      .select("game_username, game_password, credits_balance, last_synced_at, updated_at")
+      .eq("user_id", user.id)
+      .eq("game_id", game.id)
+      .maybeSingle();
+
+    if (account?.game_username) {
+      return {
+        game_username: account.game_username,
+        game_password: account.game_password ?? null,
+        status: "completed" as const,
+        completed_at: account.last_synced_at ?? account.updated_at,
+        created_at: account.updated_at,
+      };
+    }
+  }
 
   const { data } = await supabase
     .from("game_load_requests")

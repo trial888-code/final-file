@@ -22,7 +22,7 @@ export function DashboardShell({ children, sidebar }: DashboardShellProps) {
 
   return (
     <LobbyAppShell sidebar={sidebar}>
-      <div className="vip-page-content mx-auto max-w-5xl py-2 px-1 sm:px-2 pb-4">
+      <div className="vip-page-content mx-auto w-full max-w-5xl px-3 py-2 sm:px-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-4">
         {children}
       </div>
     </LobbyAppShell>

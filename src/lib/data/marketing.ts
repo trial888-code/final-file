@@ -437,7 +437,14 @@ export const getGames = unstable_cache(
           .eq("is_active", true)
           .order("popularity", { ascending: false });
         if (error || !data?.length) return null;
-        return data as MarketingGame[];
+        const rows = data as MarketingGame[];
+        const seen = new Set<string>();
+        return rows.filter((g) => {
+          const key = g.slug.trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       })(),
       FALLBACK_GAMES
     ),

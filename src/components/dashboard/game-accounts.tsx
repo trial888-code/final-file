@@ -6,12 +6,10 @@ import { formatDistanceToNow } from "date-fns";
 import { GlassCard } from "@/components/shared/glass-card";
 import { Button } from "@/components/ui/button";
 import {
-  CreateAccountButton,
   LoadCreditsButton,
   RedeemButton,
 } from "@/components/dashboard/game-account-actions";
-import type { GameAccount } from "@/lib/database.types";
-import type { ActiveJob, CreatableGame } from "@/lib/data/dashboard";
+import type { DashboardGameAccount, ActiveJob } from "@/lib/data/dashboard";
 
 const INITIALS_BG = [
   "from-ws-gold/30 to-ws-gold/10",
@@ -54,7 +52,7 @@ function GameAccountCard({
   walletBalance,
   activeJob,
 }: {
-  account: GameAccount;
+  account: DashboardGameAccount;
   index: number;
   walletBalance: number;
   activeJob?: ActiveJob;
@@ -65,6 +63,10 @@ function GameAccountCard({
   const syncedAt = account.last_synced_at
     ? formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })
     : null;
+  const isPending = account.pending || activeJob?.loadType === "create_account" || activeJob?.loadType === "new_account";
+  const job = isPending ? (activeJob ?? { loadType: "create_account", status: "pending" }) : activeJob;
+  const hasRealGameId =
+    !account.game_id.startsWith("pending-") && !account.game_id.startsWith("orphan-");
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-foreground/8 bg-ws-surface/60 p-4">
@@ -81,7 +83,7 @@ function GameAccountCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate font-semibold">{name}</p>
-            {activeJob && <JobPill job={activeJob} />}
+            {job && <JobPill job={job} />}
           </div>
           <p className="truncate text-xs text-muted-foreground">@{account.game_username}</p>
         </div>
@@ -89,20 +91,38 @@ function GameAccountCard({
 
       <div className="flex items-end justify-between gap-2">
         <div>
-          <p className="hud-label text-muted-foreground">Credits</p>
-          <p className="tnum text-2xl font-bold text-ws-gold">
-            {account.credits_balance.toLocaleString()}
-          </p>
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <RefreshCcw className="size-3" aria-hidden />
-            {syncedAt ? `synced ${syncedAt}` : "pending sync"}
-          </div>
+          {isPending ? (
+            <>
+              <p className="hud-label text-muted-foreground">Status</p>
+              <p className="text-sm text-muted-foreground">Account setup in progress…</p>
+            </>
+          ) : (
+            <>
+              <p className="hud-label text-muted-foreground">Credits</p>
+              <p className="tnum text-2xl font-bold text-ws-gold">
+                {account.credits_balance.toLocaleString()}
+              </p>
+              <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <RefreshCcw className="size-3" aria-hidden />
+                {syncedAt ? `synced ${syncedAt}` : "pending sync"}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <LoadCreditsButton gameId={account.game_id} walletBalance={walletBalance} />
-          {account.credits_balance > 0 && (
-            <RedeemButton gameId={account.game_id} gameBalance={account.credits_balance} />
+          {!isPending && hasRealGameId && (
+            <>
+              <LoadCreditsButton gameId={account.game_id} walletBalance={walletBalance} />
+              {account.credits_balance > 0 && (
+                <RedeemButton gameId={account.game_id} gameBalance={account.credits_balance} />
+              )}
+            </>
+          )}
+          {!isPending && !hasRealGameId && game?.slug && (
+            <Button asChild size="sm" variant="outline" className="shrink-0">
+              <Link href={`/games/${game.slug}`}>Manage</Link>
+            </Button>
           )}
           {game?.play_url ? (
             <Button asChild size="sm" variant="ghost" className="shrink-0">
@@ -128,20 +148,18 @@ function GameAccountCard({
 export function GameAccountsSection({
   accounts,
   walletBalance,
-  creatableGames,
   activeJobs = {},
 }: {
-  accounts: GameAccount[];
+  accounts: DashboardGameAccount[];
   walletBalance: number;
-  creatableGames: CreatableGame[];
   activeJobs?: Record<string, ActiveJob>;
 }) {
-  const hasNothing = accounts.length === 0 && creatableGames.length === 0;
+  const hasNothing = accounts.length === 0;
 
   return (
     <GlassCard className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="hud-label text-muted-foreground">My Game Accounts</p>
+        <p className="hud-label text-muted-foreground">Linked accounts</p>
         <div className="flex items-center gap-2 text-sm">
           <Wallet className="size-4 text-ws-gold" aria-hidden />
           <span className="text-muted-foreground">Wallet</span>
@@ -156,48 +174,25 @@ export function GameAccountsSection({
         <div className="mt-4 flex flex-col items-center gap-3 py-6 text-center">
           <Gamepad2 className="size-10 text-ws-gold/40" aria-hidden />
           <p className="text-sm font-medium">No game accounts yet</p>
-          <p className="text-xs text-muted-foreground">
-            Add funds to your wallet, then create a game account to start playing.
+          <p className="max-w-sm text-xs text-muted-foreground">
+            Open a game in the lobby, create your free account there, then come back here to load and cash out.
           </p>
           <Button asChild size="sm" variant="outline" className="mt-1">
-            <Link href="/dashboard/deposit">Add Funds to Wallet</Link>
+            <Link href="/">Browse lobby</Link>
           </Button>
         </div>
       ) : (
-        <>
-          {accounts.length > 0 && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {accounts.map((account, i) => (
-                <GameAccountCard
-                  key={account.id}
-                  account={account}
-                  index={i}
-                  walletBalance={walletBalance}
-                  activeJob={activeJobs[account.games?.slug ?? ""]}
-                />
-              ))}
-            </div>
-          )}
-
-          {creatableGames.length > 0 && (
-            <div className="mt-5 border-t border-foreground/8 pt-4">
-              <p className="text-xs font-medium text-muted-foreground">
-                Create a new game account (free)
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {creatableGames.map((g) => (
-                  <div
-                    key={g.id}
-                    className="flex items-center gap-2 rounded-lg border border-foreground/8 bg-ws-surface/60 px-3 py-2"
-                  >
-                    <span className="text-sm">{g.name}</span>
-                    <CreateAccountButton gameId={g.id} gameName={g.name} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {accounts.map((account, i) => (
+            <GameAccountCard
+              key={account.id}
+              account={account}
+              index={i}
+              walletBalance={walletBalance}
+              activeJob={activeJobs[account.games?.slug ?? ""]}
+            />
+          ))}
+        </div>
       )}
     </GlassCard>
   );

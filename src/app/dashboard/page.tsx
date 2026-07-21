@@ -13,20 +13,13 @@ import {
 import { formatDistanceToNow } from "date-fns";
 
 import { ClaimButton } from "@/components/dashboard/claim-button";
-import { GameAccountsSection } from "@/components/dashboard/game-accounts";
-import { HomeGuides } from "@/components/spinora/home-guides";
-import { HomeReviews } from "@/components/spinora/home-reviews";
-import { HomeFaq } from "@/components/spinora/home-faq";
 import {
-  getActiveJobsByGame,
-  getCreatableGames,
   getDashboardCore,
-  getGameAccounts,
+  getGameAccountSummary,
   getRecentActivity,
   getRewardsOverview,
   getWalletData,
 } from "@/lib/data/dashboard";
-import { getFaqs, getHomepageReviews, getLatestBlogPosts } from "@/lib/data/marketing";
 
 const QUICK_ACTIONS = [
   { label: "Add Funds", sub: "Top up wallet", href: "/dashboard/deposit", icon: Plus, accent: "text-ws-green-deep dark:text-ws-green" },
@@ -41,18 +34,12 @@ export default async function DashboardHomePage() {
   const multiplier = Number(tier?.reward_multiplier ?? 1);
   const displayName = profile.display_name ?? profile.username ?? "Player";
 
-  const [rewards, activity, gameAccounts, wallet, creatableGames, activeJobs, guides, faqs, reviews] =
-    await Promise.all([
-      getRewardsOverview(profile, multiplier),
-      getRecentActivity(6),
-      getGameAccounts(),
-      getWalletData(),
-      getCreatableGames(),
-      getActiveJobsByGame(),
-      getLatestBlogPosts(),
-      getFaqs(),
-      getHomepageReviews(),
-    ]);
+  const [rewards, activity, gameSummary, wallet] = await Promise.all([
+    getRewardsOverview(profile, multiplier),
+    getRecentActivity(6),
+    getGameAccountSummary(),
+    getWalletData(),
+  ]);
 
   const daily = rewards.streams.find((s) => s.rule.reward_type === "daily");
 
@@ -142,12 +129,29 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
-      <GameAccountsSection
-        accounts={gameAccounts}
-        walletBalance={wallet.balance}
-        creatableGames={creatableGames}
-        activeJobs={activeJobs}
-      />
+      <Link
+        href="/dashboard/games"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-foreground/10 bg-card p-5 transition-colors hover:border-ws-green/30 hover:bg-ws-surface/60"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-ws-green/10 text-ws-green-deep dark:text-ws-green">
+            <Gamepad2 className="size-5" aria-hidden />
+          </span>
+          <div>
+            <p className="font-semibold text-foreground">My Games</p>
+            <p className="text-sm text-muted-foreground">
+              {gameSummary.total === 0
+                ? "Create accounts and manage loads from one place."
+                : gameSummary.pending > 0
+                  ? `${gameSummary.linked} linked · ${gameSummary.pending} setting up`
+                  : `${gameSummary.linked} linked game${gameSummary.linked === 1 ? "" : "s"}`}
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 text-sm font-medium text-ws-green-deep dark:text-ws-green">
+          Open →
+        </span>
+      </Link>
 
       <div className="rounded-2xl border border-foreground/10 bg-card p-5">
         <div className="flex items-center justify-between">
@@ -176,9 +180,6 @@ export default async function DashboardHomePage() {
         )}
       </div>
 
-      <HomeGuides posts={guides} />
-      <HomeReviews reviews={reviews} />
-      <HomeFaq faqs={faqs} limit={5} />
     </div>
   );
 }

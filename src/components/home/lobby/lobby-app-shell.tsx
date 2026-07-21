@@ -53,7 +53,7 @@ export function LobbyAppShell({ children, sidebar }: LobbyAppShellProps) {
         {/* Main column: top bar + scrollable content */}
         <div className="lobby-main-col flex flex-col flex-1 min-w-0 min-h-0">
           <LobbyTopBar onMenuClick={() => setMobileOpen(true)} />
-          <div className="lobby-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide px-2 pb-1 pt-1.5">
+          <div className="lobby-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide px-2 sm:px-3 pb-24 sm:pb-20 pt-1.5">
             {children}
           </div>
         </div>

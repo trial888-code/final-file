@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { GAMES } from "@/lib/games";
 import type {
   Achievement,
   Profile,
@@ -11,6 +11,7 @@ import type {
   UserAchievement,
   VipTier,
 } from "@/lib/database.types";
+import { createClient } from "@/lib/supabase/server";
 
 /** UTC period keys — must mirror SQL period_key_for(). */
 export function utcDateKey(d = new Date()): string {
@@ -328,12 +329,164 @@ export async function getRecentActivity(limit = 8) {
 }
 
 export async function getGameAccounts() {
-  const { supabase } = await requireUser();
-  const { data } = await supabase
+  return getDashboardGameAccounts();
+}
+
+function staticGameMeta(slug: string) {
+  const game = GAMES.find((g) => g.slug === slug);
+  if (!game) return null;
+  return { name: game.name, slug: game.slug, image_url: game.image, play_url: null as string | null };
+}
+
+function enrichAccountGames<T extends { games?: { slug: string; name: string; image_url: string | null; play_url: string | null } | null }>(
+  row: T
+): T {
+  if (!row.games?.slug) return row;
+  const meta = staticGameMeta(row.games.slug);
+  if (!meta) return row;
+  return {
+    ...row,
+    games: {
+      ...row.games,
+      name: row.games.name || meta.name,
+      image_url: row.games.image_url || meta.image_url,
+      play_url: row.games.play_url ?? meta.play_url,
+    },
+  };
+}
+
+/** Linked game accounts plus in-flight creates and legacy rows not yet in game_accounts. */
+export type DashboardGameAccount = import("@/lib/database.types").GameAccount & {
+  pending?: boolean;
+};
+
+export async function getLinkedGameSlugs(userId: string): Promise<string[]> {
+  const accounts = await getDashboardGameAccountsForUser(userId);
+  return accounts.map((a) => a.games?.slug).filter((s): s is string => Boolean(s));
+}
+
+async function getDashboardGameAccountsForUser(userId: string): Promise<DashboardGameAccount[]> {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  if (!admin) return [];
+
+  const { data: accounts, error: accountsError } = await admin
     .from("game_accounts")
     .select("*, games(name, slug, image_url, play_url)")
+    .eq("user_id", userId)
     .order("updated_at", { ascending: false });
-  return (data ?? []) as import("@/lib/database.types").GameAccount[];
+
+  if (accountsError) {
+    console.error("[getDashboardGameAccounts]", accountsError.message);
+  }
+
+  const list: DashboardGameAccount[] = ((accounts ?? []) as DashboardGameAccount[]).map(enrichAccountGames);
+  const seenSlugs = new Set(
+    list.map((a) => a.games?.slug).filter((s): s is string => Boolean(s))
+  );
+
+  const { data: inFlight } = await admin
+    .from("game_load_requests")
+    .select("game_slug, game_name, game_username, created_at, load_type")
+    .eq("user_id", userId)
+    .in("status", ["pending", "processing"])
+    .in("load_type", ["create_account", "new_account"]);
+
+  const pendingSlugs = [...new Set((inFlight ?? []).map((j) => j.game_slug).filter(Boolean))].filter(
+    (slug) => !seenSlugs.has(slug)
+  );
+
+  if (pendingSlugs.length > 0) {
+    const { data: games } = await admin
+      .from("games")
+      .select("id, name, slug, image_url, play_url")
+      .in("slug", pendingSlugs);
+    const gameBySlug = new Map((games ?? []).map((g) => [g.slug, g]));
+
+    for (const job of inFlight ?? []) {
+      if (!job.game_slug || seenSlugs.has(job.game_slug)) continue;
+      const dbGame = gameBySlug.get(job.game_slug);
+      const meta = dbGame
+        ? enrichAccountGames({ games: dbGame }).games!
+        : staticGameMeta(job.game_slug);
+      if (!meta) continue;
+      list.push({
+        id: `pending-${job.game_slug}`,
+        user_id: userId,
+        game_id: dbGame?.id ?? `pending-${job.game_slug}`,
+        game_username: job.game_username?.trim() || "creating…",
+        game_user_id: null,
+        credits_balance: 0,
+        last_synced_at: null,
+        created_at: job.created_at,
+        updated_at: job.created_at,
+        games: meta,
+        pending: true,
+      });
+      seenSlugs.add(job.game_slug);
+    }
+  }
+
+  const { data: completedOrphans } = await admin
+    .from("game_load_requests")
+    .select("game_slug, game_name, game_username, completed_at, created_at")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in("load_type", ["create_account", "new_account"])
+    .not("game_username", "is", null)
+    .order("completed_at", { ascending: false });
+
+  const orphanSlugs = [...new Set((completedOrphans ?? []).map((r) => r.game_slug).filter(Boolean))].filter(
+    (slug) => !seenSlugs.has(slug)
+  );
+
+  if (orphanSlugs.length > 0) {
+    const { data: games } = await admin
+      .from("games")
+      .select("id, name, slug, image_url, play_url")
+      .in("slug", orphanSlugs);
+    const gameBySlug = new Map((games ?? []).map((g) => [g.slug, g]));
+
+    for (const row of completedOrphans ?? []) {
+      if (!row.game_slug || seenSlugs.has(row.game_slug)) continue;
+      const dbGame = gameBySlug.get(row.game_slug);
+      const meta = dbGame
+        ? enrichAccountGames({ games: dbGame }).games!
+        : staticGameMeta(row.game_slug);
+      if (!meta) continue;
+      const ts = row.completed_at ?? row.created_at;
+      list.push({
+        id: `orphan-${row.game_slug}`,
+        user_id: userId,
+        game_id: dbGame?.id ?? `orphan-${row.game_slug}`,
+        game_username: row.game_username!,
+        game_user_id: null,
+        credits_balance: 0,
+        last_synced_at: row.completed_at,
+        created_at: ts,
+        updated_at: ts,
+        games: {
+          ...meta,
+          name: row.game_name || meta.name,
+        },
+      });
+      seenSlugs.add(row.game_slug);
+    }
+  }
+
+  return list;
+}
+
+export async function getDashboardGameAccounts(): Promise<DashboardGameAccount[]> {
+  const { user } = await requireUser();
+  return getDashboardGameAccountsForUser(user.id);
+}
+
+export async function getGameAccountSummary() {
+  const accounts = await getDashboardGameAccounts();
+  const linked = accounts.filter((a) => !a.pending).length;
+  const pending = accounts.filter((a) => a.pending).length;
+  return { total: accounts.length, linked, pending };
 }
 
 /** Real-money wallet (deposit + cash-out) + recent ledger for the signed-in user. */
