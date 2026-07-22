@@ -2,6 +2,7 @@ import type { Locator, Page } from "playwright";
 import { mkdirSync } from "fs";
 import { join } from "path";
 import { waitForPanelLogin } from "../../shared/panel-login-captcha.js";
+import { isSessionExpiredVisible } from "../../shared/panel-session-expired.js";
 
 const DEBUG_DIR = join(process.cwd(), "debug");
 
@@ -117,6 +118,7 @@ export async function fillSelectorOrPlaceholder(
 }
 
 export async function isLoginPage(page: Page): Promise<boolean> {
+  if (await isSessionExpiredVisible(page)) return true;
   if (page.url().includes("/login")) return true;
   const pwd = await page.locator('input[type="password"]').count();
   const signIn = page.getByRole("button", { name: /sign in|log in|login/i });

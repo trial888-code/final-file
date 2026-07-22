@@ -24,6 +24,11 @@ async function findCaptchaInput(page: Page): Promise<Locator | null> {
   const explicit = page
     .locator(
       [
+        'input[name="code"]',
+        'input[name="verifyCode"]',
+        'input[name="verify_code"]',
+        'input[name="captcha"]',
+        'input[name="vcode"]',
         'input[placeholder*="code" i]',
         'input[placeholder*="verify" i]',
         'input[placeholder*="captcha" i]',
@@ -53,14 +58,18 @@ async function findCaptchaInput(page: Page): Promise<Locator | null> {
 async function findCaptchaImage(page: Page): Promise<Locator | null> {
   const srcPatterns = [
     'img[src*="captcha" i]',
+    'img[src*="Captcha" i]',
     'img[src*="verify" i]',
     'img[src*="vcode" i]',
     'img[src*="validate" i]',
+    'img[src*="code" i]',
     "#verifyImg",
     "#captchaImg",
+    "#imgVerify",
     ".captcha img",
     ".verify-code img",
     ".login-captcha img",
+    ".layui-form img",
   ];
 
   for (const sel of srcPatterns) {
@@ -216,6 +225,10 @@ async function attemptAutoCaptchaLogin(page: Page, options: PanelLoginOptions): 
     try {
       const result = await solveCaptchaImage(png);
       solution = result.text;
+      if (!solution || solution.length < 3) {
+        log("login", "CAPTCHA read returned empty — skipping fill");
+        return false;
+      }
       log("login", `CAPTCHA read (${result.method}, ${solution.length} chars): ${solution}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -2,6 +2,7 @@ import type { Locator, Page } from "playwright";
 import { passwordForAccount } from "./credentials.js";
 import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isCaptchaSolverConfigured } from "../../shared/panel-login-captcha.js";
+import { dismissSessionExpiredModal } from "../../shared/panel-session-expired.js";
 import { isLoginPage, log, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 const ADMIN_URL = process.env.VEGAS_ADMIN_URL?.trim() || "https://agent.lasvegassweeps.com/login";
@@ -11,6 +12,8 @@ const USER_MGMT_URL = `${BASE_URL}/userManagement`;
 /* ------------------------------------------------------------------ login */
 
 export async function loginToPanel(page: Page): Promise<void> {
+  await dismissSessionExpiredModal(page, log);
+
   const alreadyOnPanel =
     /userManagement/i.test(page.url()) && !(await isLoginPage(page));
   if (!alreadyOnPanel) {
@@ -61,6 +64,10 @@ function visibleDialog(page: Page): Locator {
 }
 
 async function closeOverlays(page: Page): Promise<void> {
+  if (await dismissSessionExpiredModal(page, log)) {
+    await loginToPanel(page);
+    return;
+  }
   for (let i = 0; i < 5; i++) {
     const dlg = visibleDialog(page);
     if (!(await dlg.isVisible().catch(() => false))) break;

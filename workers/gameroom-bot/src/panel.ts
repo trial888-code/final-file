@@ -2,6 +2,7 @@ import type { Frame, Locator, Page } from "playwright";
 import { normalizeUsername, passwordForAccount } from "./credentials.js";
 import { CREATE_ACCOUNT_MAX_ATTEMPTS, DUPLICATE_USERNAME_RE } from "../../shared/panel-create.js";
 import { isCaptchaSolverConfigured } from "../../shared/panel-login-captcha.js";
+import { dismissSessionExpiredModal } from "../../shared/panel-session-expired.js";
 import { isLoginPage, log, parseMoney, screenshot, waitForManualLogin } from "./panel-utils.js";
 
 /**
@@ -41,6 +42,7 @@ function isAdminDashboard(url: string): boolean {
 
 export async function loginToPanel(page: Page): Promise<void> {
   await page.bringToFront().catch(() => {});
+  await dismissSessionExpiredModal(page, log);
 
   const onDashboard =
     (isAdminDashboard(page.url()) || /player\/index/i.test(page.url())) &&
@@ -355,9 +357,13 @@ async function waitForCredentialSummary(
   return null;
 }
 
-/** Close any open layui popup (Add user / Recharge / credential summary / etc.). */
+/** Close any open layui popup (Add user / Recharge / credential summary / session timeout / etc.). */
 async function dismissAllLayers(page: Page): Promise<void> {
   await assertPageOpen(page);
+  if (await dismissSessionExpiredModal(page, log)) {
+    await loginToPanel(page);
+    return;
+  }
   for (let i = 0; i < 10; i++) {
     await dismissCredentialSuccessDialog(page);
     if (!(await layerShadeVisible(page))) break;

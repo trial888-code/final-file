@@ -54,7 +54,30 @@ function normalizeCaptchaText(raw: string): string {
   return raw.replace(/[^0-9A-Za-z]/g, "").trim();
 }
 
+const REJECTED_OCR_GUESSES = new Set([
+  "none",
+  "null",
+  "undefined",
+  "nan",
+  "image",
+  "captcha",
+  "verify",
+  "code",
+  "login",
+  "user",
+  "password",
+]);
+
+function isRejectedCaptchaGuess(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t || REJECTED_OCR_GUESSES.has(t)) return true;
+  // OCR noise on blank/broken images — single repeated char
+  if (t.length >= 3 && new Set(t).size === 1) return true;
+  return false;
+}
+
 function looksLikeCaptcha(text: string): boolean {
+  if (isRejectedCaptchaGuess(text)) return false;
   return text.length >= 3 && text.length <= 8;
 }
 
@@ -85,6 +108,7 @@ async function solveWithLocalOcr(image: Buffer): Promise<string | null> {
   const text = normalizeCaptchaText(data.text);
 
   if (!text || text.length < 3) return null;
+  if (isRejectedCaptchaGuess(text)) return null;
   if (data.confidence < ocrMinConfidence()) return null;
   if (!looksLikeCaptcha(text)) return null;
   return text;
@@ -122,7 +146,11 @@ async function solveWith2Captcha(apiKey: string, imageBase64: string): Promise<s
     const resultRes = await fetch(resultUrl);
     const resultJson = (await resultRes.json()) as { status?: number; request?: string };
     if (resultJson.status === 1 && resultJson.request) {
-      return normalizeCaptchaText(resultJson.request);
+      const text = normalizeCaptchaText(resultJson.request);
+      if (isRejectedCaptchaGuess(text) || !looksLikeCaptcha(text)) {
+        throw new Error(`2Captcha returned invalid text: ${text || "(empty)"}`);
+      }
+      return text;
     }
     if (resultJson.request && !/NOT_READY|PROCESSING/i.test(resultJson.request)) {
       throw new Error(`2Captcha error: ${resultJson.request}`);
@@ -170,7 +198,11 @@ async function solveWithCapSolver(apiKey: string, imageBase64: string): Promise<
       throw new Error(`CapSolver error: ${resultJson.errorDescription ?? "unknown"}`);
     }
     if (resultJson.status === "ready" && resultJson.solution?.text) {
-      return normalizeCaptchaText(resultJson.solution.text);
+      const text = normalizeCaptchaText(resultJson.solution.text);
+      if (isRejectedCaptchaGuess(text) || !looksLikeCaptcha(text)) {
+        throw new Error(`CapSolver returned invalid text: ${text || "(empty)"}`);
+      }
+      return text;
     }
     if (resultJson.status === "failed") {
       throw new Error("CapSolver could not solve CAPTCHA");
@@ -197,19 +229,40 @@ async function solveWithPaidApi(image: Buffer): Promise<string> {
   return text;
 }
 
-/** Read CAPTCHA from image: local OCR first, optional paid API second. */
+/** Read CAPTCHA from image: paid API first when CAPTCHA_API_KEY is set, else local OCR. */
 export async function solveCaptchaImage(image: Buffer): Promise<{ text: string; method: "ocr" | "api" }> {
-  if (isAutoCaptchaEnabled()) {
+  const apiKey = env("CAPTCHA_API_KEY");
+  const ocrFirstRaw = env("CAPTCHA_OCR_FIRST");
+  const ocrFirst =
+    ocrFirstRaw != null
+      ? !/^(false|0|off)$/i.test(ocrFirstRaw)
+      : !apiKey; // default: OCR only when no paid key
+
+  const tryOcr = async (): Promise<{ text: string; method: "ocr" } | null> => {
+    if (!isAutoCaptchaEnabled()) return null;
     const local = await solveWithLocalOcr(image);
-    if (local) return { text: local, method: "ocr" };
+    return local ? { text: local, method: "ocr" } : null;
+  };
+
+  if (ocrFirst) {
+    const ocr = await tryOcr();
+    if (ocr) return ocr;
   }
 
-  if (env("CAPTCHA_API_KEY")) {
+  if (apiKey) {
     const text = await solveWithPaidApi(image);
     return { text, method: "api" };
   }
 
-  throw new Error("Could not read CAPTCHA — local OCR was unsure and no CAPTCHA_API_KEY fallback");
+  if (!ocrFirst) {
+    const ocr = await tryOcr();
+    if (ocr) return ocr;
+  }
+
+  throw new Error(
+    "Could not read CAPTCHA — local OCR was unsure and CAPTCHA_API_KEY is not set. " +
+      "Add your 2Captcha key to workers/.env as CAPTCHA_API_KEY=... then run: node sync-bot-env.mjs"
+  );
 }
 
 export function captchaMaxRetries(): number {
