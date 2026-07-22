@@ -34,7 +34,7 @@ export type BonusRedeemResolution =
   | { ok: true; amount: number }
   | { ok: false; error: string };
 
-/** Resolve redeem for bonus-wallet loads (7x min balance, 15x max cap per bonus load). */
+/** Resolve redeem for bonus-wallet loads (1x min balance, 5x max cap per bonus load). */
 export function resolveBonusRedeemAmount(input: {
   gameBalance: number;
   requestedAmount: number;

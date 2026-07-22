@@ -3,6 +3,19 @@ export const SITE_NAME = "Spinora";
 /** Daily spin wheel is live (win rates capped server-side in prize-engine). */
 export const DAILY_SPIN_ENABLED = true;
 
+/** Bonus / freeplay wager rules — 1x rollover to unlock, 5x max cashout cap. */
+export const BONUS_WAGER_RULES = {
+  rolloverMultiplier: 1,
+  maxCashoutMultiplier: 5,
+} as const;
+
+/** Spin wheel freeplay defaults */
+export const FREEPLAY_RULES = {
+  minBonusCash: 1,
+  maxBonusCash: 10,
+  vipPointsPerSpin: 25,
+} as const;
+
 /** VIP points awarded per successful referral */
 export const REFERRAL_REWARD_POINTS = 10;
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://spinoracasinos.com";

@@ -28,10 +28,10 @@ export const GAME_BONUS_RULES = {
   redeemMax: 8,
 } as const;
 
-/** Bonus wallet load → bonus redeem wallet */
+/** Bonus wallet load → bonus redeem wallet (1x wager, 5x max cashout cap). */
 export const GAME_BONUS_REDEEM_RULES = {
-  redeemMin: 7,
-  redeemMax: 15,
+  redeemMin: 1,
+  redeemMax: 5,
 } as const;
 
 export const UPCOMING_GAME_MESSAGE =

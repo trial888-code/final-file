@@ -5,6 +5,7 @@ import { homeMetadata } from "@/lib/seo/metadata";
 import { ClientProviders } from "@/components/providers/client-providers";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { LiveCasinoChatWidget } from "@/components/chat/live-casino-chat-widget";
+import { RecentWinnersTicker } from "@/components/shared/recent-winners-ticker";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,7 +18,7 @@ const inter = Inter({
 export const metadata: Metadata = homeMetadata;
 
 export const viewport: Viewport = {
-  themeColor: "#030008",
+  themeColor: "#0B0E14",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className} suppressHydrationWarning>
         <ClientProviders>
           {children}
+          <RecentWinnersTicker />
           <LiveCasinoChatWidget />
           <MobileBottomNav />
         </ClientProviders>

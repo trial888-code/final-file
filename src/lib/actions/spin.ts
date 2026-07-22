@@ -179,10 +179,37 @@ export async function spinWheel(): Promise<SpinResult> {
   });
 
   if (error) {
-    if (error.message.includes("wheel_spins")) {
-      return { error: "Wheel system not set up. Run supabase/wheel-spins.sql in Supabase." };
+    const msg = error.message ?? String(error);
+    console.error("[spinWheel] wheel_spins insert failed:", msg, error.code, error.details);
+
+    if (/relation .*wheel_spins.* does not exist/i.test(msg) || error.code === "42P01") {
+      return {
+        error:
+          "Wheel table missing. In Supabase SQL Editor run the full file: supabase/wheel-spins-patch.sql (not spin_history migration).",
+      };
     }
-    return { error: error.message };
+    if (/wheel_spins_prize_type_check|check constraint/i.test(msg)) {
+      return {
+        error:
+          "Wheel schema outdated (missing points prize type). Run supabase/wheel-spins-patch.sql in Supabase SQL Editor.",
+      };
+    }
+    if (/permission denied|42501|row-level security/i.test(msg)) {
+      return {
+        error:
+          "Wheel permission denied. Run supabase/wheel-spins-patch.sql to fix RLS grants, then hard-refresh and spin again.",
+      };
+    }
+    if (/foreign key|profiles/i.test(msg)) {
+      return {
+        error:
+          "Your profile row is missing in Supabase. Log out and back in, or ask support to sync your profile.",
+      };
+    }
+    if (msg.includes("wheel_spins")) {
+      return { error: `Wheel error: ${msg}. Run supabase/wheel-spins-patch.sql if you have not yet.` };
+    }
+    return { error: msg };
   }
 
   if (prize.type === "cash" && prize.value > 0) {
@@ -212,6 +239,26 @@ export async function spinWheel(): Promise<SpinResult> {
       user.id,
       "Wheel Prize Won!",
       `You won ${prize.label}! $${prize.value} added to your Total Deposit and +${pointsToAdd} VIP points.`,
+      "success"
+    );
+  } else if (prize.type === "points" && prize.value > 0) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("vip_points")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      await supabase
+        .from("profiles")
+        .update({ vip_points: profile.vip_points + prize.value })
+        .eq("id", user.id);
+    }
+
+    await createNotification(
+      user.id,
+      "VIP Points Won!",
+      `You won ${prize.label}! +${prize.value} VIP points added to your account.`,
       "success"
     );
   }

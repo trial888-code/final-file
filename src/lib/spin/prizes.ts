@@ -1,3 +1,5 @@
+import { FREEPLAY_RULES } from "@/lib/constants";
+
 export interface WheelPrize {
   id: string;
   label: string;
@@ -8,15 +10,19 @@ export interface WheelPrize {
   weight: number;
 }
 
+/** Prioritize VIP points and small bonus amounts; jackpots remain rare. */
 export const WHEEL_PRIZES: WheelPrize[] = [
-  { id: "7", label: "$7", type: "cash", value: 7, emoji: "💎", color: "#1a0a2e", weight: 1 },
-  { id: "luck1", label: "BETTER LUCK NEXT TIME", type: "luck", value: 0, emoji: "🎲", color: "#0c1830", weight: 42 },
-  { id: "2", label: "$2", type: "cash", value: 2, emoji: "💵", color: "#0a1428", weight: 4 },
-  { id: "3", label: "$3", type: "cash", value: 3, emoji: "🥇", color: "#0c1830", weight: 4 },
-  { id: "1", label: "$1", type: "cash", value: 1, emoji: "🎰", color: "#0a1428", weight: 5 },
-  { id: "luck2", label: "BETTER LUCK NEXT TIME", type: "luck", value: 0, emoji: "🍀", color: "#0c1830", weight: 42 },
-  { id: "4", label: "$4", type: "cash", value: 4, emoji: "🔥", color: "#0a1428", weight: 3 },
-  { id: "10", label: "$10", type: "cash", value: 10, emoji: "🎉", color: "#1a0a2e", weight: 2 },
+  { id: "pts50", label: "50 VIP PTS", type: "points", value: 50, emoji: "👑", color: "#0f172a", weight: 22 },
+  { id: "luck1", label: "BETTER LUCK NEXT TIME", type: "luck", value: 0, emoji: "🎲", color: "#0c1830", weight: 18 },
+  { id: "pts25", label: "25 VIP PTS", type: "points", value: 25, emoji: "⭐", color: "#0a1428", weight: 20 },
+  { id: "1", label: "$1", type: "cash", value: 1, emoji: "🎰", color: "#0a1428", weight: 14 },
+  { id: "pts100", label: "100 VIP PTS", type: "points", value: 100, emoji: "💫", color: "#1a0a2e", weight: 8 },
+  { id: "luck2", label: "BETTER LUCK NEXT TIME", type: "luck", value: 0, emoji: "🍀", color: "#0c1830", weight: 12 },
+  { id: "2", label: "$2", type: "cash", value: 2, emoji: "💵", color: "#0a1428", weight: 10 },
+  { id: "3", label: "$3", type: "cash", value: 3, emoji: "🥇", color: "#0c1830", weight: 8 },
+  { id: "5", label: "$5", type: "cash", value: 5, emoji: "🔥", color: "#0a1428", weight: 5 },
+  { id: "7", label: "$7", type: "cash", value: 7, emoji: "💎", color: "#1a0a2e", weight: 2 },
+  { id: "10", label: "$10", type: "cash", value: FREEPLAY_RULES.maxBonusCash, emoji: "🎉", color: "#1a0a2e", weight: 1 },
 ];
 
 export const DAILY_SPINS_BY_TIER: Record<string, number> = {

@@ -53,6 +53,8 @@ const rpcChecks = [
   ["ai_blog_settings", () => db.from("ai_blog_settings").select("id").limit(1)],
   ["wallet_transactions", () => db.from("wallet_transactions").select("id", { head: true, count: "exact" })],
   ["profiles.cashout_wallet", () => db.from("profiles").select("cashout_wallet, kyc_status").limit(1)],
+  ["wheel_spins", () => db.from("wheel_spins").select("id", { head: true, count: "exact" })],
+  ["get_wheel_daily_stats rpc", () => db.rpc("get_wheel_daily_stats")],
 ];
 
 console.log("\n=== Database (Section A) ===");
@@ -61,4 +63,5 @@ for (const [name, fn] of rpcChecks) {
   console.log(`${error ? "FAIL" : "OK"}  ${name}${error ? `: ${error.message}` : ""}`);
 }
 
-console.log("\nDone. If any FAIL, run supabase/SECTION-A-PATCH.sql in SQL Editor.");
+console.log("\nDone. If wheel_spins FAIL, run supabase/wheel-spins-patch.sql in SQL Editor.");
+console.log("If other FAIL, run supabase/SECTION-A-PATCH.sql in SQL Editor.");

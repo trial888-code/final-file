@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/env";
+
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
@@ -20,6 +22,16 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  if (!isSupabaseConfigured()) {
+    if (isProtected) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "supabase_unconfigured");
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({ request });
+  }
+
   if (isProtected && !hasSupabaseSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -33,24 +45,20 @@ export async function updateSession(request: NextRequest) {
   }
 
   let supabaseResponse = NextResponse.next({ request });
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
+  const supabase = createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
 
   let {
     data: { user },
@@ -74,7 +82,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && emailConfirmed && isAuth && path !== "/auth/callback" && !path.startsWith("/reset-password/update")) {
+  if (
+    user &&
+    emailConfirmed &&
+    isAuth &&
+    path !== "/auth/callback" &&
+    !path.startsWith("/reset-password/update")
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = request.nextUrl.searchParams.get("redirect") || "/dashboard";
     url.searchParams.delete("redirect");
@@ -82,13 +96,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAdmin) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
 
-    if (profile?.role !== "admin") {
+      if (profile?.role !== "admin") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
+    } catch {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);

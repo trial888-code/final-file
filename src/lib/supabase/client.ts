@@ -1,21 +1,20 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/env";
+
 let client: SupabaseClient | null = null;
 
-export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
+export function createClient(): SupabaseClient | null {
+  if (!isSupabaseConfigured()) {
     if (typeof window !== "undefined") {
-      console.warn("Supabase env vars missing — auth/chat disabled");
+      console.warn("[supabase] Env vars missing — auth and realtime disabled");
     }
     return null;
   }
 
   if (!client) {
-    client = createBrowserClient(url, key);
+    client = createBrowserClient(getSupabaseUrl(), getSupabaseAnonKey());
   }
 
   return client;

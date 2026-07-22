@@ -1,21 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #030008;
-  --color-foreground: #f5f5f5;
-  --color-card: #140030;
-  --color-card-foreground: #f5f5f5;
-  --color-primary: #fbbf24;
-  --color-primary-foreground: #1a0a00;
-  --color-secondary: #1a0035;
-  --color-secondary-foreground: #e9d5ff;
-  --color-muted: #1a0035;
-  --color-muted-foreground: #a78bfa;
-  --color-accent: #9333ea;
-  --color-accent-foreground: #ffffff;
+  --color-background: #0b0e14;
+  --color-foreground: #f1f5f9;
+  --color-card: #12161f;
+  --color-card-foreground: #f1f5f9;
+  --color-primary: #10b981;
+  --color-primary-foreground: #022c22;
+  --color-secondary: #161b26;
+  --color-secondary-foreground: #e2e8f0;
+  --color-muted: #161b26;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #f59e0b;
+  --color-accent-foreground: #1a0a00;
   --color-destructive: #ef4444;
-  --color-border: rgba(147, 51, 234, 0.25);
-  --color-ring: #fbbf24;
+  --color-border: rgba(16, 185, 129, 0.18);
+  --color-ring: #10b981;
+  --color-hub-emerald: #10b981;
+  --color-hub-gold: #f59e0b;
+  --color-hub-obsidian: #0b0e14;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
@@ -31,6 +34,37 @@ body {
   color: var(--color-foreground);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(245, 158, 11, 0.04), transparent);
+}
+
+/* Enterprise hub — frosted glass + neon emerald accents */
+.hub-glass {
+  background: rgba(18, 22, 31, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.12);
+}
+
+.hub-card {
+  background: linear-gradient(145deg, rgba(18, 22, 31, 0.95) 0%, rgba(11, 14, 20, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.hub-card-glow {
+  border-color: rgba(16, 185, 129, 0.2);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(16, 185, 129, 0.06);
+}
+
+.hub-gradient-text {
+  background: linear-gradient(135deg, #10b981, #34d399, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 body.lobby-mode {

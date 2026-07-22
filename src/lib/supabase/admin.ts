@@ -1,11 +1,23 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  getSupabaseAnonKey,
+  getSupabaseServiceRoleKey,
+  getSupabaseUrl,
+  isSupabaseConfigured,
+} from "@/lib/supabase/env";
+
 /** Server-only client for auth lookups (never expose to the browser) */
 export function createAdminClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!isSupabaseConfigured()) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[supabase] Admin client unavailable — service role or anon key missing");
+    }
+    return null;
+  }
 
-  if (!url || !key) return null;
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey() ?? getSupabaseAnonKey();
 
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
